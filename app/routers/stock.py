@@ -24,8 +24,8 @@ def add_stock(operation: StockOperation, db: Session = Depends(get_db)):
         Stock.location_id == operation.location_id
     ).first()
     if stock:
-        stock.quantity += operation.quantity
-        stock.updated_at = datetime.utcnow()
+        stock.quantity += operation.quantity  # type: ignore[assignment]
+        stock.updated_at = datetime.utcnow()  # type: ignore
     else:
         stock = Stock(
             product_id=operation.product_id,
@@ -50,8 +50,8 @@ def remove_stock(operation: StockOperation, db: Session = Depends(get_db)):
     if stock.quantity < operation.quantity:
         raise HTTPException(status_code=400, detail="Insufficient stock")
     
-    stock.quantity -= operation.quantity
-    stock.updated_at = datetime.utcnow()
+    stock.quantity -= operation.quantity  # type: ignore[assignment]
+    stock.updated_at = datetime.utcnow()  # type: ignore
     db.commit()
     db.refresh(stock)
     return stock

@@ -11,6 +11,7 @@ pytest==7.4.3
 pytest-cov==4.1.0
 httpx==0.25.1  # For async testing
 pytest-asyncio==0.21.1
+pytest-html
 
 # Development tools
 black==23.11.0  # Code formatting

@@ -1,11 +1,11 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, MetaData, PrimaryKeyConstraint
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-# Configure schema-aware metadata
 metadata = MetaData(schema="wms_schema")
-Base = declarative_base(metadata=metadata)
+class Base(DeclarativeBase):
+    metadata = metadata
 
 class Product(Base):
     __tablename__ = "products"
@@ -30,6 +30,7 @@ class Stock(Base):
     product_id = Column(Integer, ForeignKey("wms_schema.products.id"), nullable=False)
     location_id = Column(Integer, ForeignKey("wms_schema.locations.id"), nullable=False)
     quantity = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     product = relationship("Product", back_populates="stock")
     location = relationship("Location", back_populates="stock")
 

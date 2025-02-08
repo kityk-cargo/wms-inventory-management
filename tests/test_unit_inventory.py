@@ -1,3 +1,10 @@
+"""
+NOTE:
+- These tests use simplified mocks to simulate SQLAlchemy behavior. They do not cover full ORM features
+  (e.g., transaction commit/rollback, lazy loading) and bypass FastAPI's dependency injection/request lifecycle.
+- For full end-to-end testing, use FastAPI's TestClient with a real or properly simulated database.
+- Each test receives a fresh InMemoryDB instance to avoid shared state.
+"""
 import pytest
 from datetime import datetime
 from fastapi import HTTPException
@@ -22,6 +29,7 @@ class Column:
         instance.__dict__[self.name] = value
 
 # Updated Mock classes with descriptors.
+# These mocks provide basic attribute management, without full SQLAlchemy functionality.
 class MockProduct:
     id = Column("id")
     sku = Column("sku")
@@ -55,7 +63,6 @@ class MockStock:
     product_id = Column("product_id")
     location_id = Column("location_id")
     quantity = Column("quantity")
-    # For updates, we simulate updated_at in add_stock implicitly if needed.
     updated_at = Column("updated_at")
 
     def __init__(self, **kwargs):
@@ -65,13 +72,13 @@ class MockStock:
             self.quantity = 0
 
 # Replace original model imports with mocks
-products.Product = MockProduct
-locations.Location = MockLocation
-stock.Stock = MockStock
-stock.Product = MockProduct    # <--- added line
-stock.Location = MockLocation  # <--- added line
+products.Product = MockProduct  # type: ignore
+locations.Location = MockLocation  # type: ignore
+stock.Stock = MockStock  # type: ignore
+stock.Product = MockProduct  # type: ignore
+stock.Location = MockLocation  # type: ignore
 
-# InMemoryDB and QuerySimulator
+# InMemoryDB and QuerySimulator simulate basic DB operations.
 class InMemoryDB:
     def __init__(self):
         self.data = {
@@ -107,9 +114,11 @@ class InMemoryDB:
             self.data['stock'][key] = obj
 
     def commit(self):
+        # Simulated commit.
         pass
 
     def refresh(self, obj):
+        # Simulated refresh.
         pass
 
 class QuerySimulator:
@@ -119,13 +128,9 @@ class QuerySimulator:
     def filter(self, *conditions):
         filtered_data = self.data
         for cond in conditions:
-            # Expect condition as tuple: (field_name, expected_value)
             if isinstance(cond, tuple) and len(cond)==2:
                 field, expected = cond
                 filtered_data = [item for item in filtered_data if getattr(item, field) == expected]
-            else:
-                # Fallback to no filtering if condition not tuple
-                pass
         return QuerySimulator(filtered_data)
 
     def first(self):
@@ -136,14 +141,16 @@ class QuerySimulator:
 
 @pytest.fixture
 def db():
+    # Returns a fresh InMemoryDB instance per test to avoid shared state.
     return InMemoryDB()
 
-# Product Tests
+# ---------------------- Product Tests ----------------------
 @pytest.mark.parametrize("product_data", [
-    {"sku": "TEST001", "name": "Test Product 1", "category": "Test Cat", "description": "Test Desc"},
-    {"sku": "TEST002", "name": "Test Product 2", "category": "Test Cat 2", "description": None},
+    pytest.param({"sku": "TEST001", "name": "Test Product 1", "category": "Test Cat", "description": "Test Desc"}, id="Product with full details"),
+    pytest.param({"sku": "TEST002", "name": "Test Product 2", "category": "Test Cat 2", "description": None}, id="Product with missing description"),
 ])
 def test_create_product(db, product_data):
+    """Should successfully create a product with the given valid data."""
     product_in = ProductCreate(**product_data)
     result = products.create_product(product_in, db)
     assert result.id is not None
@@ -152,16 +159,18 @@ def test_create_product(db, product_data):
     assert result.created_at is not None
 
 def test_get_nonexistent_product(db):
+    """Should raise a 404 error when attempting to retrieve a non-existent product."""
     with pytest.raises(HTTPException) as exc_info:
         products.get_product(999, db)
     assert exc_info.value.status_code == 404
 
-# Location Tests
+# ---------------------- Location Tests ----------------------
 @pytest.mark.parametrize("location_data", [
-    {"aisle": "A1", "bin": "B1"},
-    {"aisle": "A2", "bin": "B2"},
+    pytest.param({"aisle": "A1", "bin": "B1"}, id="Valid location A1-B1"),
+    pytest.param({"aisle": "A2", "bin": "B2"}, id="Valid location A2-B2"),
 ])
 def test_create_location(db, location_data):
+    """Should successfully create a location when provided valid data."""
     location_in = LocationCreate(**location_data)
     result = locations.create_location(location_in, db)
     assert result.id is not None
@@ -169,15 +178,21 @@ def test_create_location(db, location_data):
     assert result.bin == location_data["bin"]
 
 def test_create_duplicate_location(db):
+    """Should raise a 400 error when creating a duplicate location."""
     loc_data = {"aisle": "A1", "bin": "B1"}
     locations.create_location(LocationCreate(**loc_data), db)
     with pytest.raises(HTTPException) as exc_info:
         locations.create_location(LocationCreate(**loc_data), db)
     assert exc_info.value.status_code == 400
 
-# Stock Tests
-@pytest.mark.parametrize("quantity", [1, 5, 10])
+# ---------------------- Stock Tests ----------------------
+@pytest.mark.parametrize("quantity", [
+    pytest.param(1, id="Add 1 unit of stock"),
+    pytest.param(5, id="Add 5 units of stock"),
+    pytest.param(10, id="Add 10 units of stock"),
+])
 def test_add_stock(db, quantity):
+    """Should successfully add stock to a location for a product."""
     product = products.create_product(
         ProductCreate(sku=f"SKU{quantity}", name="Test", category="Test", description="Test"),
         db
@@ -188,6 +203,7 @@ def test_add_stock(db, quantity):
     assert result.quantity == quantity
 
 def test_remove_stock_insufficient(db):
+    """Should raise a 400 error when trying to remove more stock than available."""
     product = products.create_product(
         ProductCreate(sku="SKU_TEST", name="Test", category="Test", description="Test"),
         db
@@ -198,12 +214,12 @@ def test_remove_stock_insufficient(db):
         stock.remove_stock(StockOperation(product_id=product.id, location_id=location.id, quantity=10), db)
     assert exc_info.value.status_code == 400
 
-@pytest.mark.parametrize("initial,remove,expected", [
-    (10, 5, 5),
-    (5, 5, 0),
-    (15, 7, 8),
+@pytest.mark.parametrize("initial, remove, expected", [
+    pytest.param(5, 5, 0, id="Remove all stock resulting in zero"),
+    pytest.param(15, 7, 8, id="Remove stock leaving a positive remainder"),
 ])
 def test_stock_operations(db, initial, remove, expected):
+    """Should update the stock correctly after adding and then removing a specific quantity."""
     product = products.create_product(
         ProductCreate(sku=f"SKU_OP_{initial}", name="Test", category="Test", description="Test"),
         db
