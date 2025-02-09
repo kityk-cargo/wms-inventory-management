@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
 import os
 from dotenv import load_dotenv
 
@@ -16,6 +15,7 @@ full_database_url = f"postgresql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE
 
 engine = create_engine(full_database_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def get_db():
     db = SessionLocal()
