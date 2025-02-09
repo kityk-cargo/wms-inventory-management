@@ -1,0 +1,4 @@
+; Fuck E501
+[flake8]
+ignore = E501
+exclude = .venv
