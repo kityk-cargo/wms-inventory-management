@@ -10,18 +10,13 @@ router = APIRouter()
 
 # Define Pydantic example instances for locations
 example_location_obj = LocationResponse(
-    id=200,
-    aisle="C12",
-    bin="D34",
-    created_at=datetime(2023, 6, 1, 8, 0, 0)
+    id=200, aisle="C12", bin="D34", created_at=datetime(2023, 6, 1, 8, 0, 0)
 )
 
 example_location_obj_alt = LocationResponse(
-    id=201,
-    aisle="C13",
-    bin="D35",
-    created_at=datetime(2023, 6, 2, 9, 0, 0)
+    id=201, aisle="C13", bin="D35", created_at=datetime(2023, 6, 2, 9, 0, 0)
 )
+
 
 @router.post("/", response_model=LocationResponse)
 def create_location(location: LocationCreate, db: Session = Depends(get_db)):
@@ -64,7 +59,7 @@ def get_location(location_id: int, db: Session = Depends(get_db)):
 
 
 @router.get(
-    "/", 
+    "/",
     response_model=List[LocationResponse],
     responses={
         200: {
@@ -81,7 +76,7 @@ def get_location(location_id: int, db: Session = Depends(get_db)):
                                         id=202,
                                         aisle="D05",
                                         bin="B08",
-                                        created_at=datetime(2023, 6, 3, 10, 30, 0)
+                                        created_at=datetime(2023, 6, 3, 10, 30, 0),
                                     ).dict()
                                 },
                                 {
@@ -89,16 +84,16 @@ def get_location(location_id: int, db: Session = Depends(get_db)):
                                         id=203,
                                         aisle="D07",
                                         bin="A02",
-                                        created_at=datetime(2023, 6, 4, 11, 15, 0)
+                                        created_at=datetime(2023, 6, 4, 11, 15, 0),
                                     ).dict()
-                                }
+                                },
                             ]
                         }
                     }
                 }
             }
         }
-    }
+    },
 )
 def list_locations(db: Session = Depends(get_db)):
     return db.query(Location).all()

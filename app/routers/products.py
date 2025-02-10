@@ -16,7 +16,7 @@ example_product_obj = ProductResponse(
     category="Lighting Equipment",
     description="A high-end LED panel for industrial use",
     created_at=datetime(2023, 5, 5, 9, 0, 0),
-    updated_at=datetime(2023, 5, 6, 10, 0, 0)
+    updated_at=datetime(2023, 5, 6, 10, 0, 0),
 )
 
 example_product_obj_alt = ProductResponse(
@@ -26,8 +26,9 @@ example_product_obj_alt = ProductResponse(
     category="Lighting Equipment",
     description="Energy efficient 40W LED panel",
     created_at=datetime(2023, 4, 1, 8, 0, 0),
-    updated_at=datetime(2023, 4, 2, 8, 30, 0)
+    updated_at=datetime(2023, 4, 2, 8, 30, 0),
 )
+
 
 @router.post("/", response_model=ProductResponse)
 def create_product(product: ProductCreate, db: Session = Depends(get_db)):
@@ -37,6 +38,7 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     db.refresh(db_product)
     return db_product
 
+
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -44,8 +46,9 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
+
 @router.get(
-    "/", 
+    "/",
     response_model=List[ProductResponse],
     responses={
         200: {
@@ -55,14 +58,14 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
                         "multiple_products": {
                             "value": [
                                 example_product_obj.dict(),
-                                example_product_obj_alt.dict()
+                                example_product_obj_alt.dict(),
                             ]
                         }
                     }
                 }
             }
         }
-    }
+    },
 )
 def list_products(db: Session = Depends(get_db)):
     return db.query(Product).all()
