@@ -23,14 +23,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements-dev.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-html flake8 black mypy
+          pip install -r requirements-dev.txt
 
       - name: Lint with flake8
         run: |
