@@ -2,9 +2,8 @@ name: Pre-Code Review Pipeline
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
+    types: [opened, synchronize]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
       - name: Cache pip dependencies
         uses: actions/cache@v3
