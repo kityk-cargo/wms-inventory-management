@@ -2,9 +2,8 @@ name: Pre-Code Review Pipeline
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
+    types: [opened, synchronize]
+  workflow_dispatch:
 
 jobs:
   build:

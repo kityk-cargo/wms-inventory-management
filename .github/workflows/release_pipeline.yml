@@ -2,14 +2,17 @@ name: Release Pipeline
 
 on:
   workflow_dispatch:  # manual trigger
-  pull_request:
-    types: [closed]
+  pull_request: #temp: make it run on PR so that we can test it
+    types: [opened, synchronize]
     branches:
       - main
+# uncomment when it would be stable  pull_request:
+#    types: [closed]
+#    branches:
+#      - main
 
 jobs:
   release:
-    # Only run if the PR was merged (not just closed)
     if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -56,7 +59,7 @@ jobs:
           python -c "from app.main import app; import json, yaml; spec = app.openapi(); \
           json.dump(spec, open('openapi.json','w'), indent=2); \
           yaml.dump(spec, open('openapi.yaml','w'), default_flow_style=False)"
-      
+
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -66,19 +69,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload OpenAPI spec JSON
-        uses: softprops/action-gh-release@v1/upload
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./openapi.json
           asset_name: openapi.json
           asset_content_type: application/json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload OpenAPI spec YAML
-        uses: softprops/action-gh-release@v1/upload
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./openapi.yaml
           asset_name: openapi.yaml
           asset_content_type: application/x-yaml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
