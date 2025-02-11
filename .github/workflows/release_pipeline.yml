@@ -2,14 +2,10 @@ name: Release Pipeline
 
 on:
   workflow_dispatch:  # manual trigger
-  pull_request: #temp: make it run on PR so that we can test it
-    types: [opened, synchronize]
+  pull_request:
+    types: [closed]
     branches:
       - main
-# uncomment when it would be stable  pull_request:
-#    types: [closed]
-#    branches:
-#      - main
 
 jobs:
   release:
