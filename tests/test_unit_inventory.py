@@ -11,6 +11,9 @@ from fastapi import HTTPException
 from app.routers import products, locations, stock
 from app.schemas import ProductCreate, LocationCreate, StockOperation
 
+# Add module-level fixture usage so pact_setup is initialized once for the file.
+pytestmark = pytest.mark.usefixtures("pact_setup")
+
 
 # Helpers for simulating SQLAlchemy column expressions
 class ColumnExpression:

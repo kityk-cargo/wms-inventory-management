@@ -1,5 +1,7 @@
 import sys
 from pathlib import Path
+import pytest
+from pact import Consumer, Provider
 
 # Add the project root directory to Python path
 project_root = str(Path(__file__).parent.parent)
@@ -22,3 +24,22 @@ def pytest_collection_modifyitems(items):
                     item._nodeid = summary + param_part
                 else:
                     item._nodeid = summary
+
+
+PACT_MOCK_HOST = "localhost"
+PACT_MOCK_PORT = 1234
+
+
+# Use session scope to initialize pact_setup once for all tests
+@pytest.fixture(scope="session")
+def pact_setup():
+    pact = Consumer("WMSInventory").has_pact_with(
+        Provider("WMSNotification"),
+        host_name=PACT_MOCK_HOST,
+        port=PACT_MOCK_PORT,
+        log_dir="./logs",
+        pact_dir="./pacts",
+    )
+    pact.start_service()
+    yield pact
+    pact.stop_service()
