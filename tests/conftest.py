@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 import pytest
-from pact import Consumer, Provider
+from pact import Consumer, Provider  # type: ignore
 
 # Add the project root directory to Python path
 project_root = str(Path(__file__).parent.parent)
