@@ -1,10 +1,11 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime
 from app.database import get_db
 from app.models import Stock, Product, Location
 from app.schemas import StockOperation, StockResponse
-from datetime import datetime
+from app.services.notification import send_low_stock_alert  # new import
 
 router = APIRouter()
 
@@ -41,6 +42,9 @@ def add_stock(operation: StockOperation, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(stock)
+    # Trigger alert if low stock (<20)
+    if stock.quantity < 20:
+        send_low_stock_alert(stock)
     return stock
 
 
@@ -67,6 +71,9 @@ def remove_stock(operation: StockOperation, db: Session = Depends(get_db)):
     stock.updated_at = datetime.utcnow()  # type: ignore
     db.commit()
     db.refresh(stock)
+    # Trigger alert if low stock (<20)
+    if stock.quantity < 20:
+        send_low_stock_alert(stock)
     return stock
 
 
