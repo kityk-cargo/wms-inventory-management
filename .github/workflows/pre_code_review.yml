@@ -42,6 +42,10 @@ jobs:
         run: |
           mypy .
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
-          pytest --maxfail=0 --disable-warnings -q
+          pytest tests/unit --maxfail=0 --disable-warnings
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration --maxfail=0 --disable-warnings
