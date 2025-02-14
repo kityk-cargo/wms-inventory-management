@@ -6,9 +6,12 @@ pytest-cov==4.1.0
 httpx==0.25.1  # For async testing
 pytest-asyncio==0.21.1
 pytest-html
+types-requests
 
 # Development tools
 black==23.11.0  # Code formatting
 isort==5.12.0  # Import sorting
 flake8==6.1.0  # Linting
 mypy==1.7.0  # Type checking
+pact-python==1.0.1  # Added Pact dependency
+testcontainers

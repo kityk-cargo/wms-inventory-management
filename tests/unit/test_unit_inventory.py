@@ -10,6 +10,10 @@ from datetime import datetime
 from fastapi import HTTPException
 from app.routers import products, locations, stock
 from app.schemas import ProductCreate, LocationCreate, StockOperation
+from unittest.mock import patch
+
+# Add module-level fixture usage so pact_setup is initialized once for the file.
+pytestmark = pytest.mark.usefixtures("pact_setup")
 
 
 # Helpers for simulating SQLAlchemy column expressions
@@ -181,8 +185,11 @@ def db():
 )
 def test_create_product(db, product_data):
     """Should successfully create a product with the given valid data."""
+    # Arrange
     product_in = ProductCreate(**product_data)
+    # Act
     result = products.create_product(product_in, db)
+    # Assert
     assert result.id is not None
     assert result.sku == product_data["sku"]
     assert result.name == product_data["name"]
@@ -191,8 +198,11 @@ def test_create_product(db, product_data):
 
 def test_get_nonexistent_product(db):
     """Should raise a 404 error when attempting to retrieve a non-existent product."""
+    # Arrange (implicit: no product exists)
+    # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
         products.get_product(999, db)
+    # Assert
     assert exc_info.value.status_code == 404
 
 
@@ -206,8 +216,11 @@ def test_get_nonexistent_product(db):
 )
 def test_create_location(db, location_data):
     """Should successfully create a location when provided valid data."""
+    # Arrange
     location_in = LocationCreate(**location_data)
+    # Act
     result = locations.create_location(location_in, db)
+    # Assert
     assert result.id is not None
     assert result.aisle == location_data["aisle"]
     assert result.bin == location_data["bin"]
@@ -215,10 +228,13 @@ def test_create_location(db, location_data):
 
 def test_create_duplicate_location(db):
     """Should raise a 400 error when creating a duplicate location."""
+    # Arrange
     loc_data = {"aisle": "A1", "bin": "B1"}
     locations.create_location(LocationCreate(**loc_data), db)
+    # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
         locations.create_location(LocationCreate(**loc_data), db)
+    # Assert
     assert exc_info.value.status_code == 400
 
 
@@ -226,29 +242,39 @@ def test_create_duplicate_location(db):
 @pytest.mark.parametrize(
     "quantity",
     [
-        pytest.param(1, id="Add 1 unit of stock"),
-        pytest.param(5, id="Add 5 units of stock"),
-        pytest.param(10, id="Add 10 units of stock"),
+        pytest.param(1, id="Add 1 unit of stock (alert expected)"),
+        pytest.param(5, id="Add 5 units of stock (alert expected)"),
+        pytest.param(10, id="Add 10 units of stock (alert expected)"),
+        pytest.param(25, id="Add 25 units of stock (no alert)"),
     ],
 )
 def test_add_stock(db, quantity):
-    """Should successfully add stock to a location for a product."""
-    product = products.create_product(
-        ProductCreate(
-            sku=f"SKU{quantity}", name="Test", category="Test", description="Test"
-        ),
-        db,
-    )
-    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
-    operation = StockOperation(
-        product_id=product.id, location_id=location.id, quantity=quantity
-    )
-    result = stock.add_stock(operation, db)
-    assert result.quantity == quantity
+    """Should add stock and trigger a low stock alert only if quantity is below threshold."""
+    # Arrange
+    with patch("app.routers.stock.send_low_stock_alert") as mock_alert:
+        product = products.create_product(
+            ProductCreate(
+                sku=f"SKU{quantity}", name="Test", category="Test", description="Test"
+            ),
+            db,
+        )
+        location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+        operation = StockOperation(
+            product_id=product.id, location_id=location.id, quantity=quantity
+        )
+        # Act
+        result = stock.add_stock(operation, db)
+        # Assert
+        assert result.quantity == quantity
+        if result.quantity < 20:
+            mock_alert.assert_called_once()
+        else:
+            mock_alert.assert_not_called()
 
 
 def test_remove_stock_insufficient(db):
     """Should raise a 400 error when trying to remove more stock than available."""
+    # Arrange
     product = products.create_product(
         ProductCreate(sku="SKU_TEST", name="Test", category="Test", description="Test"),
         db,
@@ -257,23 +283,31 @@ def test_remove_stock_insufficient(db):
     stock.add_stock(
         StockOperation(product_id=product.id, location_id=location.id, quantity=5), db
     )
+    # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
         stock.remove_stock(
             StockOperation(product_id=product.id, location_id=location.id, quantity=10),
             db,
         )
+    # Assert
     assert exc_info.value.status_code == 400
 
 
 @pytest.mark.parametrize(
     "initial, remove, expected",
     [
-        pytest.param(5, 5, 0, id="Remove all stock resulting in zero"),
-        pytest.param(15, 7, 8, id="Remove stock leaving a positive remainder"),
+        pytest.param(
+            25, 25, 0, id="Remove all stock resulting in zero (alert expected)"
+        ),
+        pytest.param(
+            25, 20, 5, id="Remove stock leaving below threshold (alert expected)"
+        ),
+        pytest.param(25, 3, 22, id="Remove stock leaving above threshold (no alert)"),
     ],
 )
 def test_stock_operations(db, initial, remove, expected):
-    """Should update the stock correctly after adding and then removing a specific quantity."""
+    """Should update stock correctly and trigger a low stock alert only when the resulting quantity is below threshold."""
+    # Arrange
     product = products.create_product(
         ProductCreate(
             sku=f"SKU_OP_{initial}", name="Test", category="Test", description="Test"
@@ -281,14 +315,24 @@ def test_stock_operations(db, initial, remove, expected):
         db,
     )
     location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
-    stock.add_stock(
-        StockOperation(
-            product_id=product.id, location_id=location.id, quantity=initial
-        ),
-        db,
-    )
-    result = stock.remove_stock(
-        StockOperation(product_id=product.id, location_id=location.id, quantity=remove),
-        db,
-    )
-    assert result.quantity == expected
+    # Add and remove stock with alert patched.
+    with patch("app.routers.stock.send_low_stock_alert") as mock_alert:
+        stock.add_stock(
+            StockOperation(
+                product_id=product.id, location_id=location.id, quantity=initial
+            ),
+            db,
+        )
+        # Act
+        result = stock.remove_stock(
+            StockOperation(
+                product_id=product.id, location_id=location.id, quantity=remove
+            ),
+            db,
+        )
+        # Assert
+        assert result.quantity == expected
+        if result.quantity < 20:
+            mock_alert.assert_called_once()
+        else:
+            mock_alert.assert_not_called()

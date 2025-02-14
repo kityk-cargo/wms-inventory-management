@@ -169,3 +169,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Pact files
+pacts/
+report.html
+unit_report.html
+integration_report.html
+assets/style.css

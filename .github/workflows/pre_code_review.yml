@@ -5,13 +5,22 @@ on:
     types: [opened, synchronize]
   workflow_dispatch:
 
+env:
+  LIQUIBASE_VERSION: "4.31.0"
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout wms-inventory-management repo
         uses: actions/checkout@v3
+
+      - name: Checkout wms-main repo
+        uses: actions/checkout@v3
+        with:
+          repository: kityk-cargo/wms-main
+          path: ./wms-main
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -42,6 +51,17 @@ jobs:
         run: |
           mypy .
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
-          pytest --maxfail=0 --disable-warnings -q
+          pytest tests/unit --maxfail=0 --disable-warnings
+          
+      - name: Pull Liquibase Image (TODO remove if possible)
+        run: docker pull liquibase/liquibase:${{ env.LIQUIBASE_VERSION }}
+
+      - name: Run integration tests
+        env:
+          LIQUIBASE_CHANGELOG_HOST: ./wms-main/liquibase/db/changelogs
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+          LIQUIBASE_VERSION: ${{ env.LIQUIBASE_VERSION }}
+        run: |
+          pytest tests/integration --maxfail=0 --disable-warnings
