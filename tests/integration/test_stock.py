@@ -27,6 +27,7 @@ def sample_data(db_session: Session):
 
 
 def test_add_stock(client_with_db: TestClient, sample_data):
+    """Should add stock and return the expected stock details."""
     # Arrange
     product, location = sample_data
     # Act
@@ -47,6 +48,7 @@ def test_add_stock(client_with_db: TestClient, sample_data):
 
 
 def test_remove_stock(client_with_db: TestClient, sample_data):
+    """Should remove stock correctly and return the updated stock details."""
     # Arrange
     product, location = sample_data
     client_with_db.post(
@@ -75,6 +77,7 @@ def test_remove_stock(client_with_db: TestClient, sample_data):
 
 
 def test_list_stock(client_with_db: TestClient, sample_data):
+    """Should list stock and include the recently added stock record."""
     # Arrange
     product, location = sample_data
     client_with_db.post(

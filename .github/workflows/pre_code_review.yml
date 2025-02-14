@@ -55,7 +55,7 @@ jobs:
         run: |
           pytest tests/unit --maxfail=0 --disable-warnings
           
-      - name: Pull Liquibase Image
+      - name: Pull Liquibase Image (TODO remove if possible)
         run: docker pull liquibase/liquibase:${{ env.LIQUIBASE_VERSION }}
 
       - name: Run integration tests

@@ -6,7 +6,9 @@ import requests
 def send_low_stock_alert(stock):
     url = os.environ.get("NOTIFICATION_SERVICE_URL")
     if not url:
-        # No URL defined, skip alert
+        logging.critical(
+            "notification-url-undefined: No URL defined for notification service, skipping alert"
+        )
         return
     payload = {
         "level": "Warning",
