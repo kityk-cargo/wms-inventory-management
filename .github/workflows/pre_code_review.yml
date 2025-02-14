@@ -55,5 +55,6 @@ jobs:
       - name: Run integration tests
         env:
           LIQUIBASE_CHANGELOG_HOST: ./wms-main/liquibase/db/changelogs
+          TESTCONTAINERS_RYUK_DISABLED: "true"
         run: |
           pytest tests/integration --maxfail=0 --disable-warnings
