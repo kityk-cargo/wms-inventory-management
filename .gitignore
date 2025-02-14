@@ -173,3 +173,6 @@ cython_debug/
 # Pact files
 pacts/
 report.html
+unit_report.html
+integration_report.html
+assets/style.css

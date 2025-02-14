@@ -42,32 +42,32 @@ def test_send_low_stock_alert_contract(
     """
     [Contract] Test sending low stock alert notification contract.
     """
-
+    # Arrange
     expected_payload = {
         "level": "Warning",
         "category": "stock alerts",
         "title": "Low stock alert for product 1 at location 101",
         "message": "Stock level is 15. Consider restocking.",
     }
-
     interaction_description = (
         "a low stock alert notification"
         if scenario == "success"
         else "a low stock alert notification that fails"
     )
-
     pact_setup.given("Stock level is low").upon_receiving(
         interaction_description
     ).with_request("post", "/alert", body=expected_payload).will_respond_with(
         status=expected_status, body=expected_response
     )
 
+    # Act
     with pact_setup:
         os.environ[
             "NOTIFICATION_SERVICE_URL"
         ] = f"http://{PACT_MOCK_HOST}:{PACT_MOCK_PORT}/alert"
         dummy_stock = SimpleNamespace(product_id=1, location_id=101, quantity=15)
         result = send_low_stock_alert(dummy_stock)
+        # Assert
         assert result == expected_response
 
     pact_setup.verify()
