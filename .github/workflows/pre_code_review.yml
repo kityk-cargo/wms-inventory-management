@@ -5,6 +5,9 @@ on:
     types: [opened, synchronize]
   workflow_dispatch:
 
+env:
+  LIQUIBASE_VERSION: "4.31.0"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -51,10 +54,14 @@ jobs:
       - name: Run unit tests
         run: |
           pytest tests/unit --maxfail=0 --disable-warnings
+          
+      - name: Pull Liquibase Image
+        run: docker pull liquibase/liquibase:${{ env.LIQUIBASE_VERSION }}
 
       - name: Run integration tests
         env:
           LIQUIBASE_CHANGELOG_HOST: ./wms-main/liquibase/db/changelogs
           TESTCONTAINERS_RYUK_DISABLED: "true"
+          LIQUIBASE_VERSION: ${{ env.LIQUIBASE_VERSION }}
         run: |
           pytest tests/integration --maxfail=0 --disable-warnings

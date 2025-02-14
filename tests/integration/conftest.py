@@ -13,9 +13,7 @@ from app.main import app
 # --- Database Container Fixture ---
 @pytest.fixture(scope="session")
 def postgres_container():
-    container = PostgresContainer(
-        "postgres:15"
-    )  # todo: the version in constants global to WMS?
+    container = PostgresContainer("postgres:15")
     container.start()
     # Create schema if not exists
     engine = create_engine(container.get_connection_url())
@@ -31,10 +29,15 @@ def postgres_container():
     password = os.getenv("POSTGRES_PASSWORD", "postgres")
     changelog_file = "001_initial_schema.sql"
     changelog_host = os.getenv("LIQUIBASE_CHANGELOG_HOST")
+    # Convert relative path to absolute path
+    changelog_host_abs = (
+        os.path.abspath(changelog_host) if changelog_host else changelog_host
+    )
     changelog_container = "/liquibase/changelog"
+    liquibase_version = os.getenv("LIQUIBASE_VERSION", "4.31.0")
     liquibase_container = (
-        DockerContainer("liquibase/liquibase")
-        .with_volume_mapping(changelog_host, changelog_container)
+        DockerContainer(f"liquibase/liquibase:{liquibase_version}")
+        .with_volume_mapping(changelog_host_abs, changelog_container)
         .with_command(
             f"--url={jdbc_url} --username={username} --password={password} "
             f"--changeLogFile={changelog_container}/{changelog_file} update"
