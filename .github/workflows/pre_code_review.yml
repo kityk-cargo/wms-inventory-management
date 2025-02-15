@@ -54,14 +54,14 @@ jobs:
       - name: Run unit tests
         run: |
           pytest tests/unit --maxfail=0 --disable-warnings
-          
+
       - name: Pull Liquibase Image (TODO remove if possible)
         run: docker pull liquibase/liquibase:${{ env.LIQUIBASE_VERSION }}
 
       - name: Run integration tests
         env:
-          LIQUIBASE_CHANGELOG_HOST: ./wms-main/liquibase/db/changelogs
+          LIQUIBASE_CHANGELOG_HOST: ./wms-main/liquibase
           TESTCONTAINERS_RYUK_DISABLED: "true"
           LIQUIBASE_VERSION: ${{ env.LIQUIBASE_VERSION }}
         run: |
-          pytest tests/integration --maxfail=0 --disable-warnings
+          pytest tests/integration -s --maxfail=0 --disable-warnings
