@@ -97,6 +97,26 @@ class InMemoryDB:
     def __init__(self):
         self.data = {"products": {}, "locations": {}, "stock": {}}
         self._id_counter = {"products": 1, "locations": 1}
+        self._original_state = {}
+
+    def _backup_state(self):
+        self._original_state = {
+            "products": self.data["products"].copy(),
+            "locations": self.data["locations"].copy(),
+            "stock": self.data["stock"].copy(),
+        }
+
+    def rollback(self):
+        if self._original_state:
+            self.data = {
+                "products": self._original_state["products"].copy(),
+                "locations": self._original_state["locations"].copy(),
+                "stock": self._original_state["stock"].copy(),
+            }
+        self._original_state = {}
+
+    def commit(self):
+        self._original_state = {}  # Clear backup after successful commit
 
     def query(self, model):
         if model == MockProduct:
@@ -122,10 +142,6 @@ class InMemoryDB:
         elif isinstance(obj, MockStock):
             key = (obj.product_id, obj.location_id)
             self.data["stock"][key] = obj
-
-    def commit(self):
-        # Simulated commit.
-        pass
 
     def refresh(self, obj):
         # Simulated refresh.
@@ -194,6 +210,7 @@ def test_create_product(db, product_data):
     assert result.sku == product_data["sku"]
     assert result.name == product_data["name"]
     assert result.created_at is not None
+    assert result.description == product_data["description"]
 
 
 def test_get_nonexistent_product(db):
@@ -203,6 +220,47 @@ def test_get_nonexistent_product(db):
     with pytest.raises(HTTPException) as exc_info:
         products.get_product(999, db)
     # Assert
+    assert exc_info.value.status_code == 404
+
+
+def test_create_product_invalid_sku(db):
+    """Should raise validation error when creating a product with invalid SKU format."""
+    # Arrange
+    invalid_product = ProductCreate(
+        sku="",  # Invalid empty SKU
+        name="Test Product",
+        category="Test",
+        description="Test",
+    )
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        products.create_product(invalid_product, db)
+    assert exc_info.value.status_code == 400
+
+
+def test_create_product_duplicate_sku(db):
+    """Should raise conflict error when creating a product with duplicate SKU."""
+    # Arrange
+    product_data = {
+        "sku": "DUPLICATE-SKU",
+        "name": "Test Product",
+        "category": "Test",
+        "description": "Test",
+    }
+    products.create_product(ProductCreate(**product_data), db)
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        products.create_product(ProductCreate(**product_data), db)
+    assert exc_info.value.status_code == 409
+
+
+@pytest.mark.parametrize("invalid_id", [-1, 0, 999999])
+def test_get_product_invalid_id(db, invalid_id):
+    """Should handle invalid product IDs gracefully."""
+    # Arrange (implicit in fixture)
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        products.get_product(invalid_id, db)
     assert exc_info.value.status_code == 404
 
 
@@ -235,6 +293,33 @@ def test_create_duplicate_location(db):
     with pytest.raises(HTTPException) as exc_info:
         locations.create_location(LocationCreate(**loc_data), db)
     # Assert
+    assert exc_info.value.status_code == 400
+
+
+def test_create_location_invalid_format(db):
+    """Should reject location creation with invalid aisle/bin format."""
+    # Arrange
+    invalid_location = LocationCreate(aisle="", bin="")  # Invalid empty values
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        locations.create_location(invalid_location, db)
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "invalid_data",
+    [
+        {"aisle": "A1", "bin": " "},
+        {"aisle": " ", "bin": "B1"},
+    ],
+)
+def test_create_location_invalid_data(db, invalid_data):
+    """Should reject location creation with various invalid data formats."""
+    # Arrange
+    location_in = LocationCreate(**invalid_data)
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        locations.create_location(location_in, db)
     assert exc_info.value.status_code == 400
 
 
@@ -336,3 +421,139 @@ def test_stock_operations(db, initial, remove, expected):
             mock_alert.assert_called_once()
         else:
             mock_alert.assert_not_called()
+
+
+def test_stock_transaction_rollback(db):
+    """Should rollback stock transaction when an error occurs."""
+    # Arrange
+    product = products.create_product(
+        ProductCreate(
+            sku="TEST-ROLLBACK", name="Test", category="Test", description="Test"
+        ),
+        db,
+    )
+    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+    initial_stock = StockOperation(
+        product_id=product.id, location_id=location.id, quantity=50
+    )
+    stock.add_stock(initial_stock, db)
+
+    # Act & Assert - Attempt to remove more stock than available
+    with pytest.raises(HTTPException) as exc_info:
+        stock.remove_stock(
+            StockOperation(
+                product_id=product.id, location_id=location.id, quantity=100
+            ),
+            db,
+        )
+
+    # Verify stock remains unchanged
+    result = (
+        db.query(MockStock)
+        .filter(
+            MockStock.product_id == product.id, MockStock.location_id == location.id
+        )
+        .first()
+    )
+    assert result.quantity == 50
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "initial_qty,remove_qty,expected_alert",
+    [
+        (50, 40, True),  # Drop below threshold (10 remaining)
+        (50, 20, False),  # Stay above threshold (30 remaining)
+        (25, 10, True),  # Already below threshold
+        (20, 20, True),  # Drop to zero
+    ],
+)
+def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
+    """Should trigger low stock alerts appropriately based on quantity thresholds."""
+    # Arrange
+    product = products.create_product(
+        ProductCreate(
+            sku=f"ALERT-{initial_qty}", name="Test", category="Test", description="Test"
+        ),
+        db,
+    )
+    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+    stock.add_stock(
+        StockOperation(
+            product_id=product.id, location_id=location.id, quantity=initial_qty
+        ),
+        db,
+    )
+
+    # Act
+    with patch("app.routers.stock.send_low_stock_alert") as mock_alert:
+        stock.remove_stock(
+            StockOperation(
+                product_id=product.id, location_id=location.id, quantity=remove_qty
+            ),
+            db,
+        )
+
+    # Assert
+    if expected_alert:
+        mock_alert.assert_called_once()
+    else:
+        mock_alert.assert_not_called()
+
+
+def test_concurrent_stock_operations(db):
+    """Should handle concurrent stock operations correctly."""
+    # Arrange
+    product = products.create_product(
+        ProductCreate(
+            sku="CONCURRENT", name="Test", category="Test", description="Test"
+        ),
+        db,
+    )
+    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+    initial_stock = StockOperation(
+        product_id=product.id, location_id=location.id, quantity=100
+    )
+    stock.add_stock(initial_stock, db)
+
+    # Act - Simulate concurrent operations
+    op1 = StockOperation(product_id=product.id, location_id=location.id, quantity=30)
+    op2 = StockOperation(product_id=product.id, location_id=location.id, quantity=40)
+
+    stock.remove_stock(op1, db)
+    stock.remove_stock(op2, db)
+
+    # Assert
+    final_stock = (
+        db.query(MockStock)
+        .filter(
+            MockStock.product_id == product.id, MockStock.location_id == location.id
+        )
+        .first()
+    )
+    assert final_stock.quantity == 30  # 100 - 30 - 40
+
+
+@pytest.mark.parametrize("invalid_quantity", [-1, 0])
+def test_stock_invalid_quantity(db, invalid_quantity):
+    """Should reject stock operations with invalid quantities."""
+    # Arrange
+    product = products.create_product(
+        ProductCreate(
+            sku="INVALID-QTY", name="Test", category="Test", description="Test"
+        ),
+        db,
+    )
+    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        stock.add_stock(
+            StockOperation(
+                product_id=product.id,
+                location_id=location.id,
+                quantity=invalid_quantity,
+            ),
+            db,
+        )
+    assert exc_info.value.status_code == 400

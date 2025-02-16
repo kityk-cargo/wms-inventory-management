@@ -20,6 +20,15 @@ example_location_obj_alt = LocationResponse(
 
 @router.post("/", response_model=LocationResponse)
 def create_location(location: LocationCreate, db: Session = Depends(get_db)):
+    if not location.aisle or len(location.aisle.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Aisle identifier cannot be empty")
+
+    if not location.bin or len(location.bin.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Bin identifier cannot be empty")
+
+    location.aisle = location.aisle.strip()
+    location.bin = location.bin.strip()
+
     existing = (
         db.query(Location)
         .filter(Location.aisle == location.aisle, Location.bin == location.bin)
@@ -30,8 +39,12 @@ def create_location(location: LocationCreate, db: Session = Depends(get_db)):
 
     new_location = Location(aisle=location.aisle, bin=location.bin)
     db.add(new_location)
-    db.commit()
-    db.refresh(new_location)
+    try:
+        db.commit()
+        db.refresh(new_location)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
     return new_location
 
 
