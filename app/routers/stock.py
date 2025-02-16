@@ -12,6 +12,9 @@ router = APIRouter()
 
 @router.post("/inbound", response_model=StockResponse)
 def add_stock(operation: StockOperation, db: Session = Depends(get_db)):
+    if operation.quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be positive")
+
     # Convert IDs to integers
     prod_id = int(operation.product_id)
     loc_id = int(operation.location_id)
@@ -53,6 +56,9 @@ def add_stock(operation: StockOperation, db: Session = Depends(get_db)):
 
 @router.post("/outbound", response_model=StockResponse)
 def remove_stock(operation: StockOperation, db: Session = Depends(get_db)):
+    if operation.quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be positive")
+
     # Convert IDs to integers
     prod_id = int(operation.product_id)
     loc_id = int(operation.location_id)

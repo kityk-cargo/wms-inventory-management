@@ -32,6 +32,18 @@ example_product_obj_alt = ProductResponse(
 
 @router.post("/", response_model=ProductResponse)
 def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+    if not product.sku or len(product.sku.strip()) == 0:
+        raise HTTPException(status_code=400, detail="SKU cannot be empty")
+
+    existing = db.query(Product).filter(Product.sku == product.sku).first()
+    if existing:
+        raise HTTPException(
+            status_code=409, detail="Product with this SKU already exists"
+        )
+
+    if not product.name or len(product.name.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Product name cannot be empty")
+
     db_product = Product(**product.dict())
     db.add(db_product)
     db.commit()
@@ -41,6 +53,9 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
 
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: int, db: Session = Depends(get_db)):
+    if product_id <= 0:
+        raise HTTPException(status_code=404, detail="Invalid product ID")
+
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
