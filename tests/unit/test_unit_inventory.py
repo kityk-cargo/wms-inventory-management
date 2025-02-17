@@ -11,6 +11,10 @@ from fastapi import HTTPException
 from app.routers import products, locations, stock
 from app.schemas import ProductCreate, LocationCreate, StockOperation
 from unittest.mock import patch
+import app.models as models
+import app.repository.stock_repository as stock_repo
+import app.repository.product_repository as product_repo
+import app.repository.location_repository as location_repo
 
 # Add module-level fixture usage so pact_setup is initialized once for the file.
 pytestmark = pytest.mark.usefixtures("pact_setup")
@@ -92,20 +96,14 @@ stock.Product = MockProduct  # type: ignore
 stock.Location = MockLocation  # type: ignore
 
 # Existing patch for app.models
-import app.models as models  # NEW
-models.Product = MockProduct  # NEW
-models.Location = MockLocation  # NEW
-models.Stock = MockStock  # NEW
+models.Product = MockProduct  # type: ignore
+models.Location = MockLocation  # type: ignore
+models.Stock = MockStock  # type: ignore
 
 # NEW: Patch repository modules so that they use the mocks.
-import app.repository.stock_repository as stock_repo  # NEW
-stock_repo.Stock = MockStock  # NEW
-
-import app.repository.product_repository as product_repo  # NEW
-product_repo.Product = MockProduct  # NEW
-
-import app.repository.location_repository as location_repo  # NEW
-location_repo.Location = MockLocation  # NEW
+stock_repo.Stock = MockStock  # type: ignore
+product_repo.Product = MockProduct  # type: ignore
+location_repo.Location = MockLocation  # type: ignore
 
 
 # InMemoryDB and QuerySimulator simulate basic DB operations.
@@ -135,11 +133,11 @@ class InMemoryDB:
         self._original_state = {}  # Clear backup after successful commit
 
     def query(self, model):
-        if (model == MockProduct):
+        if model == MockProduct:
             return QuerySimulator(list(self.data["products"].values()))
-        elif (model == MockLocation):
+        elif model == MockLocation:
             return QuerySimulator(list(self.data["locations"].values()))
-        elif (model == MockStock):
+        elif model == MockStock:
             return QuerySimulator(list(self.data["stock"].values()))
         return QuerySimulator([])
 
@@ -359,7 +357,9 @@ def test_add_stock(db, quantity):
             ),
             db,
         )
-        location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
+        location = locations.create_location_endpoint(
+            LocationCreate(aisle="A1", bin="B1"), db
+        )  # changed here
         operation = StockOperation(
             product_id=product.id, location_id=location.id, quantity=quantity
         )
@@ -380,7 +380,9 @@ def test_remove_stock_insufficient(db):
         ProductCreate(sku="SKU_TEST", name="Test", category="Test", description="Test"),
         db,
     )
-    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
+    location = locations.create_location_endpoint(
+        LocationCreate(aisle="A1", bin="B1"), db
+    )  # changed here
     stock.add_stock(
         StockOperation(product_id=product.id, location_id=location.id, quantity=5), db
     )
@@ -415,7 +417,9 @@ def test_stock_operations(db, initial, remove, expected):
         ),
         db,
     )
-    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
+    location = locations.create_location_endpoint(
+        LocationCreate(aisle="A1", bin="B1"), db
+    )  # changed here
     # Add and remove stock with alert patched.
     with patch("app.routers.stock.send_low_stock_alert") as mock_alert:
         stock.add_stock(
@@ -448,7 +452,9 @@ def test_stock_transaction_rollback(db):
         ),
         db,
     )
-    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
+    location = locations.create_location_endpoint(
+        LocationCreate(aisle="A1", bin="B1"), db
+    )  # changed here
     initial_stock = StockOperation(
         product_id=product.id, location_id=location.id, quantity=50
     )
@@ -493,7 +499,9 @@ def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
         ),
         db,
     )
-    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
+    location = locations.create_location_endpoint(
+        LocationCreate(aisle="A1", bin="B1"), db
+    )  # changed here
     stock.add_stock(
         StockOperation(
             product_id=product.id, location_id=location.id, quantity=initial_qty
@@ -526,7 +534,9 @@ def test_concurrent_stock_operations(db):
         ),
         db,
     )
-    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
+    location = locations.create_location_endpoint(
+        LocationCreate(aisle="A1", bin="B1"), db
+    )  # changed here
     initial_stock = StockOperation(
         product_id=product.id, location_id=location.id, quantity=100
     )
@@ -560,7 +570,9 @@ def test_stock_invalid_quantity(db, invalid_quantity):
         ),
         db,
     )
-    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
+    location = locations.create_location_endpoint(
+        LocationCreate(aisle="A1", bin="B1"), db
+    )  # changed here
 
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:

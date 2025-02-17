@@ -1,7 +1,6 @@
 import uuid
 import pytest
 from sqlalchemy.orm import Session
-from app.models import Product
 from app.repository import product_repository
 
 
@@ -55,7 +54,9 @@ def test_get_product(db_session: Session, sample_product):
     assert fetched_product.sku == sample_product.sku, "SKU mismatch"
     assert fetched_product.name == sample_product.name, "Name mismatch"
     assert fetched_product.category == sample_product.category, "Category mismatch"
-    assert fetched_product.description == sample_product.description, "Description mismatch"
+    assert (
+        fetched_product.description == sample_product.description
+    ), "Description mismatch"
 
 
 def test_list_products(db_session: Session, sample_product):
@@ -65,7 +66,9 @@ def test_list_products(db_session: Session, sample_product):
     # Act
     products = product_repository.list_products(db_session)
     # Assert
-    assert any(p.id == sample_product.id for p in products), "Created product not found in product list"
+    assert any(
+        p.id == sample_product.id for p in products
+    ), "Created product not found in product list"
 
 
 def test_create_duplicate_product(db_session: Session, sample_product):

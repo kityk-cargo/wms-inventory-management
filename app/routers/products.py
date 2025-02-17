@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
 from app.database import get_db
-from app.models import Product
 from app.schemas import ProductCreate, ProductResponse
 import app.repository.product_repository as product_repo
 
@@ -36,11 +35,14 @@ def create_product_endpoint(product: ProductCreate, db: Session = Depends(get_db
     if not product.sku or len(product.sku.strip()) == 0:
         raise HTTPException(status_code=400, detail="SKU cannot be empty")
     if product_repo.get_by_sku(db, product.sku):
-        raise HTTPException(status_code=409, detail="Product with this SKU already exists")
+        raise HTTPException(
+            status_code=409, detail="Product with this SKU already exists"
+        )
     if not product.name or len(product.name.strip()) == 0:
         raise HTTPException(status_code=400, detail="Product name cannot be empty")
     # Delegate creation to repository
     return product_repo.create_product(db, product.dict())
+
 
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product_endpoint(product_id: int, db: Session = Depends(get_db)):
@@ -50,6 +52,7 @@ def get_product_endpoint(product_id: int, db: Session = Depends(get_db)):
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
+
 
 @router.get(
     "/",
@@ -73,4 +76,3 @@ def get_product_endpoint(product_id: int, db: Session = Depends(get_db)):
 )
 def list_products_endpoint(db: Session = Depends(get_db)):
     return product_repo.list_products(db)
-

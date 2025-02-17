@@ -1,6 +1,5 @@
 import pytest
 from sqlalchemy.orm import Session
-from app.models import Location
 from app.repository import location_repository
 
 
@@ -49,7 +48,9 @@ def test_list_locations(db_session: Session, sample_location):
     # Act
     locations = location_repository.list_locations(db_session)
     # Assert
-    assert any(loc.id == sample_location.id for loc in locations), "Created location not found in location list"
+    assert any(
+        loc.id == sample_location.id for loc in locations
+    ), "Created location not found in location list"
 
 
 def test_create_duplicate_location(db_session: Session, sample_location):

@@ -1,9 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
-from datetime import datetime
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Stock
 from app.schemas import StockOperation, StockResponse
 from app.services.notification import send_low_stock_alert
 import app.repository.stock_repository as stock_repo
@@ -11,6 +9,7 @@ import app.repository.product_repository as product_repo
 import app.repository.location_repository as location_repo
 
 router = APIRouter()
+
 
 @router.post("/inbound", response_model=StockResponse)
 def add_stock(operation: StockOperation, db: Session = Depends(get_db)):
@@ -28,11 +27,16 @@ def add_stock(operation: StockOperation, db: Session = Depends(get_db)):
     if stock:
         stock = stock_repo.update_stock_quantity(db, stock, operation.quantity)
     else:
-        stock_data = {"product_id": prod_id, "location_id": loc_id, "quantity": operation.quantity}
+        stock_data = {
+            "product_id": prod_id,
+            "location_id": loc_id,
+            "quantity": operation.quantity,
+        }
         stock = stock_repo.create_stock(db, stock_data)
     if stock.quantity < 20:
         send_low_stock_alert(stock)
     return stock
+
 
 @router.post("/outbound", response_model=StockResponse)
 def remove_stock(operation: StockOperation, db: Session = Depends(get_db)):
@@ -42,13 +46,17 @@ def remove_stock(operation: StockOperation, db: Session = Depends(get_db)):
     loc_id = int(operation.location_id)
     stock = stock_repo.get_stock(db, prod_id, loc_id)
     if not stock:
-        raise HTTPException(status_code=404, detail="No stock found for this product at the specified location")
+        raise HTTPException(
+            status_code=404,
+            detail="No stock found for this product at the specified location",
+        )
     if stock.quantity < operation.quantity:
         raise HTTPException(status_code=400, detail="Insufficient stock")
     stock = stock_repo.update_stock_quantity(db, stock, -operation.quantity)
     if stock.quantity < 20:
         send_low_stock_alert(stock)
     return stock
+
 
 @router.get("/", response_model=List[StockResponse])
 def list_stock_endpoint(db: Session = Depends(get_db)):

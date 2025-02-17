@@ -1,6 +1,5 @@
 import pytest
 import uuid
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from app.models import Product, Location, Stock
 from app.repository import stock_repository
@@ -85,10 +84,15 @@ def test_remove_stock_negative_overdraw(db_session: Session, sample_data):
     """Negative: Removing more stock than available should raise IntegrityError due to DB constraint."""
     # Arrange
     product, location = sample_data
-    stock_data = {"product_id": int(product.id), "location_id": int(location.id), "quantity": 3}
+    stock_data = {
+        "product_id": int(product.id),
+        "location_id": int(location.id),
+        "quantity": 3,
+    }
     stock = stock_repository.create_stock(db_session, stock_data)
     # Act & Assert: Expect IntegrityError when subtraction violates the non-negative constraint.
     from sqlalchemy.exc import IntegrityError
+
     with pytest.raises(IntegrityError):
         stock_repository.update_stock_quantity(db_session, stock, -5)
 
