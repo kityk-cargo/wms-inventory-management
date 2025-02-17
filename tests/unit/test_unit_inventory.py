@@ -91,6 +91,22 @@ stock.Stock = MockStock  # type: ignore
 stock.Product = MockProduct  # type: ignore
 stock.Location = MockLocation  # type: ignore
 
+# Existing patch for app.models
+import app.models as models  # NEW
+models.Product = MockProduct  # NEW
+models.Location = MockLocation  # NEW
+models.Stock = MockStock  # NEW
+
+# NEW: Patch repository modules so that they use the mocks.
+import app.repository.stock_repository as stock_repo  # NEW
+stock_repo.Stock = MockStock  # NEW
+
+import app.repository.product_repository as product_repo  # NEW
+product_repo.Product = MockProduct  # NEW
+
+import app.repository.location_repository as location_repo  # NEW
+location_repo.Location = MockLocation  # NEW
+
 
 # InMemoryDB and QuerySimulator simulate basic DB operations.
 class InMemoryDB:
@@ -119,11 +135,11 @@ class InMemoryDB:
         self._original_state = {}  # Clear backup after successful commit
 
     def query(self, model):
-        if model == MockProduct:
+        if (model == MockProduct):
             return QuerySimulator(list(self.data["products"].values()))
-        elif model == MockLocation:
+        elif (model == MockLocation):
             return QuerySimulator(list(self.data["locations"].values()))
-        elif model == MockStock:
+        elif (model == MockStock):
             return QuerySimulator(list(self.data["stock"].values()))
         return QuerySimulator([])
 
@@ -204,7 +220,7 @@ def test_create_product(db, product_data):
     # Arrange
     product_in = ProductCreate(**product_data)
     # Act
-    result = products.create_product(product_in, db)
+    result = products.create_product_endpoint(product_in, db)
     # Assert
     assert result.id is not None
     assert result.sku == product_data["sku"]
@@ -218,7 +234,7 @@ def test_get_nonexistent_product(db):
     # Arrange (implicit: no product exists)
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
-        products.get_product(999, db)
+        products.get_product_endpoint(999, db)
     # Assert
     assert exc_info.value.status_code == 404
 
@@ -234,7 +250,7 @@ def test_create_product_invalid_sku(db):
     )
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
-        products.create_product(invalid_product, db)
+        products.create_product_endpoint(invalid_product, db)
     assert exc_info.value.status_code == 400
 
 
@@ -247,10 +263,10 @@ def test_create_product_duplicate_sku(db):
         "category": "Test",
         "description": "Test",
     }
-    products.create_product(ProductCreate(**product_data), db)
+    products.create_product_endpoint(ProductCreate(**product_data), db)
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
-        products.create_product(ProductCreate(**product_data), db)
+        products.create_product_endpoint(ProductCreate(**product_data), db)
     assert exc_info.value.status_code == 409
 
 
@@ -260,7 +276,7 @@ def test_get_product_invalid_id(db, invalid_id):
     # Arrange (implicit in fixture)
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
-        products.get_product(invalid_id, db)
+        products.get_product_endpoint(invalid_id, db)
     assert exc_info.value.status_code == 404
 
 
@@ -277,7 +293,7 @@ def test_create_location(db, location_data):
     # Arrange
     location_in = LocationCreate(**location_data)
     # Act
-    result = locations.create_location(location_in, db)
+    result = locations.create_location_endpoint(location_in, db)
     # Assert
     assert result.id is not None
     assert result.aisle == location_data["aisle"]
@@ -288,10 +304,10 @@ def test_create_duplicate_location(db):
     """Should raise a 400 error when creating a duplicate location."""
     # Arrange
     loc_data = {"aisle": "A1", "bin": "B1"}
-    locations.create_location(LocationCreate(**loc_data), db)
+    locations.create_location_endpoint(LocationCreate(**loc_data), db)
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
-        locations.create_location(LocationCreate(**loc_data), db)
+        locations.create_location_endpoint(LocationCreate(**loc_data), db)
     # Assert
     assert exc_info.value.status_code == 400
 
@@ -302,7 +318,7 @@ def test_create_location_invalid_format(db):
     invalid_location = LocationCreate(aisle="", bin="")  # Invalid empty values
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
-        locations.create_location(invalid_location, db)
+        locations.create_location_endpoint(invalid_location, db)
     assert exc_info.value.status_code == 400
 
 
@@ -319,7 +335,7 @@ def test_create_location_invalid_data(db, invalid_data):
     location_in = LocationCreate(**invalid_data)
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
-        locations.create_location(location_in, db)
+        locations.create_location_endpoint(location_in, db)
     assert exc_info.value.status_code == 400
 
 
@@ -337,13 +353,13 @@ def test_add_stock(db, quantity):
     """Should add stock and trigger a low stock alert only if quantity is below threshold."""
     # Arrange
     with patch("app.routers.stock.send_low_stock_alert") as mock_alert:
-        product = products.create_product(
+        product = products.create_product_endpoint(  # changed here
             ProductCreate(
                 sku=f"SKU{quantity}", name="Test", category="Test", description="Test"
             ),
             db,
         )
-        location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+        location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
         operation = StockOperation(
             product_id=product.id, location_id=location.id, quantity=quantity
         )
@@ -360,11 +376,11 @@ def test_add_stock(db, quantity):
 def test_remove_stock_insufficient(db):
     """Should raise a 400 error when trying to remove more stock than available."""
     # Arrange
-    product = products.create_product(
+    product = products.create_product_endpoint(  # changed here
         ProductCreate(sku="SKU_TEST", name="Test", category="Test", description="Test"),
         db,
     )
-    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
     stock.add_stock(
         StockOperation(product_id=product.id, location_id=location.id, quantity=5), db
     )
@@ -393,13 +409,13 @@ def test_remove_stock_insufficient(db):
 def test_stock_operations(db, initial, remove, expected):
     """Should update stock correctly and trigger a low stock alert only when the resulting quantity is below threshold."""
     # Arrange
-    product = products.create_product(
+    product = products.create_product_endpoint(  # changed here
         ProductCreate(
             sku=f"SKU_OP_{initial}", name="Test", category="Test", description="Test"
         ),
         db,
     )
-    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
     # Add and remove stock with alert patched.
     with patch("app.routers.stock.send_low_stock_alert") as mock_alert:
         stock.add_stock(
@@ -426,13 +442,13 @@ def test_stock_operations(db, initial, remove, expected):
 def test_stock_transaction_rollback(db):
     """Should rollback stock transaction when an error occurs."""
     # Arrange
-    product = products.create_product(
+    product = products.create_product_endpoint(  # changed here
         ProductCreate(
             sku="TEST-ROLLBACK", name="Test", category="Test", description="Test"
         ),
         db,
     )
-    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
     initial_stock = StockOperation(
         product_id=product.id, location_id=location.id, quantity=50
     )
@@ -471,13 +487,13 @@ def test_stock_transaction_rollback(db):
 def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
     """Should trigger low stock alerts appropriately based on quantity thresholds."""
     # Arrange
-    product = products.create_product(
+    product = products.create_product_endpoint(  # changed here
         ProductCreate(
             sku=f"ALERT-{initial_qty}", name="Test", category="Test", description="Test"
         ),
         db,
     )
-    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
     stock.add_stock(
         StockOperation(
             product_id=product.id, location_id=location.id, quantity=initial_qty
@@ -504,13 +520,13 @@ def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
 def test_concurrent_stock_operations(db):
     """Should handle concurrent stock operations correctly."""
     # Arrange
-    product = products.create_product(
+    product = products.create_product_endpoint(  # changed here
         ProductCreate(
             sku="CONCURRENT", name="Test", category="Test", description="Test"
         ),
         db,
     )
-    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
     initial_stock = StockOperation(
         product_id=product.id, location_id=location.id, quantity=100
     )
@@ -538,13 +554,13 @@ def test_concurrent_stock_operations(db):
 def test_stock_invalid_quantity(db, invalid_quantity):
     """Should reject stock operations with invalid quantities."""
     # Arrange
-    product = products.create_product(
+    product = products.create_product_endpoint(  # changed here
         ProductCreate(
             sku="INVALID-QTY", name="Test", category="Test", description="Test"
         ),
         db,
     )
-    location = locations.create_location(LocationCreate(aisle="A1", bin="B1"), db)
+    location = locations.create_location_endpoint(LocationCreate(aisle="A1", bin="B1"), db)  # changed here
 
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
