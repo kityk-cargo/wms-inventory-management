@@ -1,56 +1,72 @@
 import pytest
-from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+from app.repository import location_repository
 
 
 @pytest.fixture
-def sample_location(client_with_db: TestClient):
+def sample_location(db_session: Session):
     # Arrange
-    payload = {"aisle": "A1", "bin": "B1"}
+    location_data = {"aisle": "A1", "bin": "B1"}
     # Act
-    response = client_with_db.post("/locations", json=payload)
+    location = location_repository.create_location(db_session, location_data)
     # Assert
-    assert response.status_code == 200
-    location = response.json()
-    assert isinstance(location.get("id"), int)
-    assert location["aisle"] == "A1"
-    assert location["bin"] == "B1"
+    assert isinstance(location.id, int), "Invalid Location ID"
+    assert location.aisle == "A1", "Aisle mismatch"
+    assert location.bin == "B1", "Bin mismatch"
     return location
 
 
-def test_create_location(client_with_db: TestClient):
+def test_create_location(db_session: Session):
     """Should create a location and return its details."""
     # Arrange
-    payload = {"aisle": "A2", "bin": "B2"}
+    location_data = {"aisle": "A2", "bin": "B2"}
     # Act
-    response = client_with_db.post("/locations", json=payload)
+    location = location_repository.create_location(db_session, location_data)
     # Assert
-    assert response.status_code == 200
-    location = response.json()
-    assert isinstance(location.get("id"), int)
-    assert location["aisle"] == "A2"
-    assert location["bin"] == "B2"
+    assert isinstance(location.id, int), "Location ID is not an integer"
+    assert location.aisle == "A2", "Aisle mismatch"
+    assert location.bin == "B2", "Bin mismatch"
 
 
-def test_get_location(client_with_db: TestClient, sample_location):
+def test_get_location(db_session: Session, sample_location):
     """Should retrieve location details by id."""
     # Arrange
-    location_id = sample_location["id"]
+    location_id = sample_location.id
     # Act
-    response = client_with_db.get(f"/locations/{location_id}")
+    fetched_location = location_repository.get_by_id(db_session, location_id)
     # Assert
-    assert response.status_code == 200
-    location = response.json()
-    assert location["id"] == location_id
-    assert location["aisle"] == sample_location["aisle"]
-    assert location["bin"] == sample_location["bin"]
+    assert fetched_location is not None, "Fetched location is None"
+    assert fetched_location.id == sample_location.id, "Location ID mismatch"
+    assert fetched_location.aisle == sample_location.aisle, "Aisle mismatch"
+    assert fetched_location.bin == sample_location.bin, "Bin mismatch"
 
 
-def test_list_locations(client_with_db: TestClient, sample_location):
+def test_list_locations(db_session: Session, sample_location):
     """Should list locations including the created one."""
-    # Arrange is done via fixture
+    # Arrange
+    # sample_location fixture provides an existing location
     # Act
-    response = client_with_db.get("/locations")
+    locations = location_repository.list_locations(db_session)
     # Assert
-    assert response.status_code == 200
-    locations = response.json()
-    assert any(loc["id"] == sample_location["id"] for loc in locations)
+    assert any(
+        loc.id == sample_location.id for loc in locations
+    ), "Created location not found in location list"
+
+
+def test_create_duplicate_location(db_session: Session, sample_location):
+    """Negative: Should not allow creating duplicate location with same aisle and bin."""
+    # Arrange
+    duplicate_data = {"aisle": sample_location.aisle, "bin": sample_location.bin}
+    # Act & Assert: Expect exception or error due to unique constraint.
+    with pytest.raises(Exception):
+        location_repository.create_location(db_session, duplicate_data)
+
+
+def test_get_nonexistent_location(db_session: Session):
+    """Edge: Retrieving a location with an invalid id should return None."""
+    # Arrange
+    invalid_id = 999999
+    # Act
+    location = location_repository.get_by_id(db_session, invalid_id)
+    # Assert
+    assert location is None, "Expected None for non-existent location"

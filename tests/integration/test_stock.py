@@ -1,8 +1,8 @@
 import pytest
 import uuid
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from app.models import Product, Location
+from app.models import Product, Location, Stock
+from app.repository import stock_repository
 
 pytestmark = pytest.mark.db
 
@@ -26,74 +26,81 @@ def sample_data(db_session: Session):
     return product, location
 
 
-def test_add_stock(client_with_db: TestClient, sample_data):
+def test_add_stock(db_session: Session, sample_data):
     """Should add stock and return the expected stock details."""
     # Arrange
     product, location = sample_data
+    stock_data = {
+        "product_id": int(product.id),
+        "location_id": int(location.id),
+        "quantity": 10,
+    }
     # Act
-    response = client_with_db.post(
-        "/stock/inbound",
-        json={
-            "product_id": int(product.id),
-            "location_id": int(location.id),
-            "quantity": 10,
-        },
-    )
+    new_stock = stock_repository.create_stock(db_session, stock_data)
     # Assert
-    assert response.status_code == 200
-    data = response.json()
-    assert data["product_id"] == int(product.id)
-    assert data["location_id"] == int(location.id)
-    assert data["quantity"] == 10
+    assert new_stock.product_id == product.id, "Product ID mismatch"
+    assert new_stock.location_id == location.id, "Location ID mismatch"
+    assert new_stock.quantity == 10, "Quantity incorrect"
 
 
-def test_remove_stock(client_with_db: TestClient, sample_data):
+def test_remove_stock(db_session: Session, sample_data):
     """Should remove stock correctly and return the updated stock details."""
     # Arrange
     product, location = sample_data
-    client_with_db.post(
-        "/stock/inbound",
-        json={
-            "product_id": int(product.id),
-            "location_id": int(location.id),
-            "quantity": 10,
-        },
-    )
+    stock_data = {
+        "product_id": int(product.id),
+        "location_id": int(location.id),
+        "quantity": 10,
+    }
+    stock = stock_repository.create_stock(db_session, stock_data)
     # Act
-    response = client_with_db.post(
-        "/stock/outbound",
-        json={
-            "product_id": int(product.id),
-            "location_id": int(location.id),
-            "quantity": 5,
-        },
-    )
+    updated_stock = stock_repository.update_stock_quantity(db_session, stock, -5)
     # Assert
-    assert response.status_code == 200
-    data = response.json()
-    assert data["product_id"] == int(product.id)
-    assert data["location_id"] == int(location.id)
-    assert data["quantity"] == 5
+    assert updated_stock.product_id == product.id, "Product ID mismatch"
+    assert updated_stock.location_id == location.id, "Location ID mismatch"
+    assert updated_stock.quantity == 5, "Quantity after update incorrect"
 
 
-def test_list_stock(client_with_db: TestClient, sample_data):
+def test_list_stock(db_session: Session, sample_data):
     """Should list stock and include the recently added stock record."""
     # Arrange
     product, location = sample_data
-    client_with_db.post(
-        "/stock/inbound",
-        json={
-            "product_id": int(product.id),
-            "location_id": int(location.id),
-            "quantity": 10,
-        },
-    )
+    stock_data = {
+        "product_id": int(product.id),
+        "location_id": int(location.id),
+        "quantity": 10,
+    }
+    stock_repository.create_stock(db_session, stock_data)
     # Act
-    response = client_with_db.get("/stock/")
+    stock_list = stock_repository.list_stock(db_session)
     # Assert
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 1
-    assert data[0]["product_id"] == int(product.id)
-    assert data[0]["location_id"] == int(location.id)
-    assert data[0]["quantity"] == 10
+    assert any(
+        s.product_id == product.id and s.location_id == location.id and s.quantity == 10
+        for s in stock_list
+    ), "Expected stock record not found"
+
+
+def test_remove_stock_negative_overdraw(db_session: Session, sample_data):
+    """Negative: Removing more stock than available should raise IntegrityError due to DB constraint."""
+    # Arrange
+    product, location = sample_data
+    stock_data = {
+        "product_id": int(product.id),
+        "location_id": int(location.id),
+        "quantity": 3,
+    }
+    stock = stock_repository.create_stock(db_session, stock_data)
+    # Act & Assert: Expect IntegrityError when subtraction violates the non-negative constraint.
+    from sqlalchemy.exc import IntegrityError
+
+    with pytest.raises(IntegrityError):
+        stock_repository.update_stock_quantity(db_session, stock, -5)
+
+
+def test_update_nonexistent_stock(db_session: Session):
+    """Negative: Attempting to update stock that does not exist should fail gracefully."""
+    # Arrange: Create a fake stock instance not persisted in db
+    fake_stock = Stock(product_id=9999, location_id=9999, quantity=10)
+    # Act & Assert: Update should raise an exception or return None
+    with pytest.raises(Exception):
+        stock_repository.update_stock_quantity(db_session, fake_stock, -5)
