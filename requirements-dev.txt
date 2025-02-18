@@ -15,3 +15,4 @@ flake8==6.1.0  # Linting
 mypy==1.7.0  # Type checking
 pact-python==1.0.1  # Added Pact dependency
 testcontainers
+mutmut==2.5.1 # Dependency for mutation testing
