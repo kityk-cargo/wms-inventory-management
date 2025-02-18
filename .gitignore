@@ -177,3 +177,6 @@ unit_report.html
 integration_report.html
 assets/style.css
 .idea/
+.mutmut-cache
+html/** 
+*/**.bak
