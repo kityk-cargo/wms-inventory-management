@@ -20,6 +20,12 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Checkout wms-contracts repo
+        uses: actions/checkout@v3
+        with:
+          repository: kityk-cargo/wms-contracts
+          path: ./wms-contracts
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
@@ -91,3 +97,39 @@ jobs:
           asset_path: ./openapi.yaml
           asset_name: openapi.yaml
           asset_content_type: application/x-yaml
+
+      - name: Verify push token exists
+        shell: bash
+        env:
+          CONTRACTS_PUSH_TOKEN: ${{ secrets.CONTRACTS_PUSH_TOKEN }}
+        run: |
+          if [ -z "$CONTRACTS_PUSH_TOKEN" ]; then
+            echo "Error: CONTRACTS_PUSH_TOKEN not defined" >&2
+            exit 1
+          fi
+          echo "Verified: CONTRACTS_PUSH_TOKEN exists"
+
+      - name: Checkout transient pact files
+        uses: actions/checkout@v3
+        with:
+          ref: pacts-transient-do_not_touch
+          path: ./pacts-transient
+
+      - name: Publish Pact file to contracts repo
+        env:
+          CONTRACTS_PUSH_TOKEN: ${{ secrets.CONTRACTS_PUSH_TOKEN }}  # must be set with write permissions
+        run: |
+            mkdir -p ./wms-contracts/pact/rest
+            cp -r ./pacts-transient/pacts/* ./wms-contracts/pact/rest/
+            cd ./wms-contracts
+            git add -f .
+            if ! git diff-index --quiet HEAD --; then
+              git config --global user.email "contract@updater.com"
+              git config --global user.name "Fast Tests Angel"
+              git commit -m "Update pact files"
+              git config --unset-all http.https://github.com/.extraheader
+              git push -f https://$CONTRACTS_PUSH_TOKEN@github.com/kityk-cargo/wms-contracts.git main
+            else
+              echo "No changes to publish"
+            fi
+
