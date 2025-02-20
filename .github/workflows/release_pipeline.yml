@@ -120,7 +120,7 @@ jobs:
           CONTRACTS_PUSH_TOKEN: ${{ secrets.CONTRACTS_PUSH_TOKEN }}  # must be set with write permissions
         run: |
           mkdir -p ./wms-contracts/pact/rest
-          cp -r ./pacts-transient/pacts* ./wms-contracts/pact/rest/
+          cp -r ./pacts-transient/pacts/* ./wms-contracts/pact/rest/
           cd ./wms-contracts
           if ! git diff --quiet; then
             git add pact/rest/*
