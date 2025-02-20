@@ -105,6 +105,8 @@ jobs:
           path: ./pacts-transient
 
       - name: Publish Pact file to contracts repo
+        env:
+          CONTRACTS_PUSH_TOKEN: ${{ secrets.CONTRACTS_PUSH_TOKEN }}  # must be set with write permissions
         run: |
           mkdir -p ./wms-contracts/pact/rest
           cp -r ./pacts-transient/* ./wms-contracts/pact/rest/
@@ -114,7 +116,7 @@ jobs:
           if ! git diff --quiet; then
             git add pact/rest/*
             git commit -m "Publish Pact file for wms_inventory_management"
-            git push origin $(git rev-parse --abbrev-ref HEAD)
+            git push https://$CONTRACTS_PUSH_TOKEN@github.com/kityk-cargo/wms-contracts.git $(git rev-parse --abbrev-ref HEAD)
           else
             echo "No changes to commit"
           fi
