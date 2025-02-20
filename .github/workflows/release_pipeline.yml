@@ -124,6 +124,8 @@ jobs:
             cd ./wms-contracts
             git add -f .
             if ! git diff-index --quiet HEAD --; then
+              git config --global user.email "contract@updater.com"
+              git config --global user.name "Fast Tests Angel"
               git commit -m "Update pact files"
               git config --unset-all http.https://github.com/.extraheader
               git push -f https://$CONTRACTS_PUSH_TOKEN@github.com/kityk-cargo/wms-contracts.git main
