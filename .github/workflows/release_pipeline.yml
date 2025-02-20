@@ -127,7 +127,7 @@ jobs:
           if ! git diff --quiet; then
             git add pact/rest/*
             git commit -m "Publish Pact file for wms_inventory_management"
-            git push -f https://$CONTRACTS_PUSH_TOKEN@github.com/kityk-cargo/wms-contracts.git $(git rev-parse --abbrev-ref HEAD)
+            git push -f https://$CONTRACTS_PUSH_TOKEN@github.com/kityk-cargo/wms-contracts.git main
           else
             echo "No changes to commit"
           fi
