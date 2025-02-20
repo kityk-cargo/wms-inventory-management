@@ -120,10 +120,8 @@ jobs:
           CONTRACTS_PUSH_TOKEN: ${{ secrets.CONTRACTS_PUSH_TOKEN }}  # must be set with write permissions
         run: |
           mkdir -p ./wms-contracts/pact/rest
-          cp -r ./pacts-transient/* ./wms-contracts/pact/rest/
+          cp -r ./pacts-transient/pacts* ./wms-contracts/pact/rest/
           cd ./wms-contracts
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
           if ! git diff --quiet; then
             git add pact/rest/*
             git commit -m "Publish Pact file for wms_inventory_management"
