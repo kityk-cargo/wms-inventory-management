@@ -74,4 +74,4 @@ jobs:
           git checkout -B pacts-transient-do_not_touch
           git add -f ./pacts/*
           git commit -m "Update transient pact files" || echo "No changes to commit"
-          git push origin pacts-transient-do_not_touch
+          git push -f origin pacts-transient-do_not_touch
