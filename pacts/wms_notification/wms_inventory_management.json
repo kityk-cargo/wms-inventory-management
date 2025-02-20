@@ -1,0 +1,62 @@
+{
+  "consumer": {
+    "name": "wms_inventory_management"
+  },
+  "provider": {
+    "name": "wms_notification"
+  },
+  "interactions": [
+    {
+      "description": "a low stock alert notification",
+      "providerState": "Stock level is low",
+      "request": {
+        "method": "post",
+        "path": "/alert",
+        "body": {
+          "level": "Warning",
+          "category": "stock alerts",
+          "title": "Low stock alert for product 1 at location 101",
+          "message": "Stock level is 15. Consider restocking."
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+        },
+        "body": {
+          "status": "success",
+          "message": "Alert sent successfully"
+        }
+      }
+    },
+    {
+      "description": "a low stock alert notification that fails",
+      "providerState": "Stock level is low",
+      "request": {
+        "method": "post",
+        "path": "/alert",
+        "body": {
+          "level": "Warning",
+          "category": "stock alerts",
+          "title": "Low stock alert for product 1 at location 101",
+          "message": "Stock level is 15. Consider restocking."
+        }
+      },
+      "response": {
+        "status": 500,
+        "headers": {
+        },
+        "body": {
+          "status": "error",
+          "message": "Failed to deliver notification",
+          "details": "Connection error"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "2.0.0"
+    }
+  }
+}
