@@ -54,7 +54,7 @@ def test_send_low_stock_alert_contract(
         if scenario == "success"
         else "a low stock alert notification that fails"
     )
-    pact_setup.given("Stock level is low").upon_receiving(
+    pact_setup.upon_receiving(
         interaction_description
     ).with_request("post", "/alert", body=expected_payload).will_respond_with(
         status=expected_status, body=expected_response
