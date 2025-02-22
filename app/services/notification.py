@@ -17,7 +17,9 @@ def send_low_stock_alert(stock):
         "message": f"Stock level is {stock.quantity}. Consider restocking.",
     }
     try:
-        response = requests.post(url, json=payload)
+        response = requests.post(
+            url, json=payload, headers={"Content-Type": "application/json"}
+        )
         response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError as e:
