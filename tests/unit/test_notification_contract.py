@@ -6,12 +6,15 @@ import os
 from types import SimpleNamespace
 import pytest
 from app.services.notification import send_low_stock_alert
+from typing import Final
 
 # Remove local pact initialization; use the shared pact_setup fixture instead.
 pytestmark = pytest.mark.usefixtures("pact_setup")
 # Optionally, retain constants if required.
 PACT_MOCK_HOST = "localhost"
 PACT_MOCK_PORT = 1234
+
+NOTIFICATION_PATH: Final[str] = "/api/v1/notifications"
 
 
 @pytest.mark.parametrize(
@@ -54,17 +57,18 @@ def test_send_low_stock_alert_contract(
         if scenario == "success"
         else "a low stock alert notification that fails"
     )
-    pact_setup.upon_receiving(
-        interaction_description
-    ).with_request("post", "/alert", body=expected_payload).will_respond_with(
-        status=expected_status, body=expected_response
-    )
+    pact_setup.upon_receiving(interaction_description).with_request(
+        "post",
+        NOTIFICATION_PATH,
+        body=expected_payload,
+        headers={"Content-Type": "application/json"},
+    ).will_respond_with(status=expected_status, body=expected_response)
 
     # Act
     with pact_setup:
         os.environ[
             "NOTIFICATION_SERVICE_URL"
-        ] = f"http://{PACT_MOCK_HOST}:{PACT_MOCK_PORT}/alert"
+        ] = f"http://{PACT_MOCK_HOST}:{PACT_MOCK_PORT}{NOTIFICATION_PATH}"
         dummy_stock = SimpleNamespace(product_id=1, location_id=101, quantity=15)
         result = send_low_stock_alert(dummy_stock)
         # Assert
