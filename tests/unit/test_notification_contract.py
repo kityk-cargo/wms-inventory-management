@@ -33,7 +33,7 @@ NOTIFICATION_PATH: Final[str] = "/api/v1/notifications"
             {
                 "status": "error",
                 "message": "Failed to deliver notification",
-                "details": "Connection error",
+                "details": "Simulated failure for testing",
             },
         ),
     ],
@@ -57,12 +57,21 @@ def test_send_low_stock_alert_contract(
         if scenario == "success"
         else "a low stock alert notification that fails"
     )
-    pact_setup.upon_receiving(interaction_description).with_request(
+    provider_state = (
+        "Notification service is configured for success"
+        if scenario == "success"
+        else "Notification service is experiencing a failure"
+    )
+    pact_setup.given(provider_state).upon_receiving(
+        interaction_description
+    ).with_request(
         "post",
         NOTIFICATION_PATH,
         body=expected_payload,
         headers={"Content-Type": "application/json"},
-    ).will_respond_with(status=expected_status, body=expected_response)
+    ).will_respond_with(
+        status=expected_status, body=expected_response
+    )
 
     # Act
     with pact_setup:

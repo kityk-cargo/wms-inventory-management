@@ -25,15 +25,19 @@ def send_low_stock_alert(stock):
     except requests.exceptions.HTTPError as e:
         logging.exception(f"alert-failed: Failed to send notification: {e}")
         # Return the expected error response on failure
+        try:
+            details = e.response.json().get("details", e.response.text)
+        except ValueError:
+            details = e.response.text
         return {
             "status": "error",
             "message": "Failed to deliver notification",
-            "details": "Connection error",
+            "details": details,
         }
     except Exception as e:
         logging.exception(f"alert-failed: Unexpected error: {e}")
         return {
             "status": "error",
             "message": "Failed to deliver notification",
-            "details": "Connection error",
+            "details": str(e),
         }

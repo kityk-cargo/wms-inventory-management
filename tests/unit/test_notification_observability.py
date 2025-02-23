@@ -40,6 +40,6 @@ def test_send_low_stock_alert_api_unreachable(monkeypatch, caplog):
     expected = {
         "status": "error",
         "message": "Failed to deliver notification",
-        "details": "Connection error",
+        "details": "API unreachable",
     }
     assert result == expected
