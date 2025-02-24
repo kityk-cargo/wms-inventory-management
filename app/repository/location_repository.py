@@ -36,7 +36,6 @@ def list_locations(db: Session):
 
 
 def exists(db: Session, aisle: str, bin: str) -> bool:
-    # returns True if a location with the given aisle and bin exists
     return bool(
         db.query(Location).filter(Location.aisle == aisle, Location.bin == bin).first()
     )

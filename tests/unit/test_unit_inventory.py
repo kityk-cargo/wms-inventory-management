@@ -351,7 +351,7 @@ def test_add_stock(db, quantity):
     """Should add stock and trigger a low stock alert only if quantity is below threshold."""
     # Arrange
     with patch("app.routers.stock.send_low_stock_alert") as mock_alert:
-        product = products.create_product_endpoint(  # changed here
+        product = products.create_product_endpoint(
             ProductCreate(
                 sku=f"SKU{quantity}", name="Test", category="Test", description="Test"
             ),
@@ -359,7 +359,7 @@ def test_add_stock(db, quantity):
         )
         location = locations.create_location_endpoint(
             LocationCreate(aisle="A1", bin="B1"), db
-        )  # changed here
+        )
         operation = StockOperation(
             product_id=product.id, location_id=location.id, quantity=quantity
         )
@@ -376,13 +376,13 @@ def test_add_stock(db, quantity):
 def test_remove_stock_insufficient(db):
     """Should raise a 400 error when trying to remove more stock than available."""
     # Arrange
-    product = products.create_product_endpoint(  # changed here
+    product = products.create_product_endpoint(
         ProductCreate(sku="SKU_TEST", name="Test", category="Test", description="Test"),
         db,
     )
     location = locations.create_location_endpoint(
         LocationCreate(aisle="A1", bin="B1"), db
-    )  # changed here
+    )
     stock.add_stock(
         StockOperation(product_id=product.id, location_id=location.id, quantity=5), db
     )
@@ -411,7 +411,7 @@ def test_remove_stock_insufficient(db):
 def test_stock_operations(db, initial, remove, expected):
     """Should update stock correctly and trigger a low stock alert only when the resulting quantity is below threshold."""
     # Arrange
-    product = products.create_product_endpoint(  # changed here
+    product = products.create_product_endpoint(
         ProductCreate(
             sku=f"SKU_OP_{initial}", name="Test", category="Test", description="Test"
         ),
@@ -419,7 +419,7 @@ def test_stock_operations(db, initial, remove, expected):
     )
     location = locations.create_location_endpoint(
         LocationCreate(aisle="A1", bin="B1"), db
-    )  # changed here
+    )
     # Add and remove stock with alert patched.
     with patch("app.routers.stock.send_low_stock_alert") as mock_alert:
         stock.add_stock(
@@ -446,7 +446,7 @@ def test_stock_operations(db, initial, remove, expected):
 def test_stock_transaction_rollback(db):
     """Should rollback stock transaction when an error occurs."""
     # Arrange
-    product = products.create_product_endpoint(  # changed here
+    product = products.create_product_endpoint(
         ProductCreate(
             sku="TEST-ROLLBACK", name="Test", category="Test", description="Test"
         ),
@@ -454,7 +454,7 @@ def test_stock_transaction_rollback(db):
     )
     location = locations.create_location_endpoint(
         LocationCreate(aisle="A1", bin="B1"), db
-    )  # changed here
+    )
     initial_stock = StockOperation(
         product_id=product.id, location_id=location.id, quantity=50
     )
@@ -493,7 +493,7 @@ def test_stock_transaction_rollback(db):
 def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
     """Should trigger low stock alerts appropriately based on quantity thresholds."""
     # Arrange
-    product = products.create_product_endpoint(  # changed here
+    product = products.create_product_endpoint(
         ProductCreate(
             sku=f"ALERT-{initial_qty}", name="Test", category="Test", description="Test"
         ),
@@ -501,7 +501,7 @@ def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
     )
     location = locations.create_location_endpoint(
         LocationCreate(aisle="A1", bin="B1"), db
-    )  # changed here
+    )
     stock.add_stock(
         StockOperation(
             product_id=product.id, location_id=location.id, quantity=initial_qty
@@ -528,7 +528,7 @@ def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
 def test_concurrent_stock_operations(db):
     """Should handle concurrent stock operations correctly."""
     # Arrange
-    product = products.create_product_endpoint(  # changed here
+    product = products.create_product_endpoint(
         ProductCreate(
             sku="CONCURRENT", name="Test", category="Test", description="Test"
         ),
@@ -536,7 +536,7 @@ def test_concurrent_stock_operations(db):
     )
     location = locations.create_location_endpoint(
         LocationCreate(aisle="A1", bin="B1"), db
-    )  # changed here
+    )
     initial_stock = StockOperation(
         product_id=product.id, location_id=location.id, quantity=100
     )
@@ -564,7 +564,7 @@ def test_concurrent_stock_operations(db):
 def test_stock_invalid_quantity(db, invalid_quantity):
     """Should reject stock operations with invalid quantities."""
     # Arrange
-    product = products.create_product_endpoint(  # changed here
+    product = products.create_product_endpoint(
         ProductCreate(
             sku="INVALID-QTY", name="Test", category="Test", description="Test"
         ),
@@ -572,7 +572,7 @@ def test_stock_invalid_quantity(db, invalid_quantity):
     )
     location = locations.create_location_endpoint(
         LocationCreate(aisle="A1", bin="B1"), db
-    )  # changed here
+    )
 
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:

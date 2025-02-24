@@ -15,21 +15,21 @@ router = APIRouter()
 def add_stock(operation: StockOperation, db: Session = Depends(get_db)):
     if operation.quantity <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be positive")
-    prod_id = int(operation.product_id)
-    loc_id = int(operation.location_id)
-    product = product_repo.get_by_id(db, prod_id)
+    product_id = operation.product_id  # renamed for clarity
+    location_id = operation.location_id  # renamed for clarity
+    product = product_repo.get_by_id(db, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    location = location_repo.get_by_id(db, loc_id)
+    location = location_repo.get_by_id(db, location_id)
     if not location:
         raise HTTPException(status_code=404, detail="Location not found")
-    stock = stock_repo.get_stock(db, prod_id, loc_id)
+    stock = stock_repo.get_stock(db, product_id, location_id)
     if stock:
         stock = stock_repo.update_stock_quantity(db, stock, operation.quantity)
     else:
         stock_data = {
-            "product_id": prod_id,
-            "location_id": loc_id,
+            "product_id": product_id,
+            "location_id": location_id,
             "quantity": operation.quantity,
         }
         stock = stock_repo.create_stock(db, stock_data)
@@ -42,9 +42,9 @@ def add_stock(operation: StockOperation, db: Session = Depends(get_db)):
 def remove_stock(operation: StockOperation, db: Session = Depends(get_db)):
     if operation.quantity <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be positive")
-    prod_id = int(operation.product_id)
-    loc_id = int(operation.location_id)
-    stock = stock_repo.get_stock(db, prod_id, loc_id)
+    product_id = operation.product_id  # renamed for clarity
+    location_id = operation.location_id  # renamed for clarity
+    stock = stock_repo.get_stock(db, product_id, location_id)
     if not stock:
         raise HTTPException(
             status_code=404,

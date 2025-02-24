@@ -32,15 +32,16 @@ example_product_obj_alt = ProductResponse(
 
 @router.post("/", response_model=ProductResponse)
 def create_product_endpoint(product: ProductCreate, db: Session = Depends(get_db)):
-    if not product.sku or len(product.sku.strip()) == 0:
+    sku = product.sku.strip()
+    name = product.name.strip()
+    if not sku:
         raise HTTPException(status_code=400, detail="SKU cannot be empty")
-    if product_repo.get_by_sku(db, product.sku):
+    if product_repo.get_by_sku(db, sku):
         raise HTTPException(
             status_code=409, detail="Product with this SKU already exists"
         )
-    if not product.name or len(product.name.strip()) == 0:
+    if not name:
         raise HTTPException(status_code=400, detail="Product name cannot be empty")
-    # Delegate creation to repository
     return product_repo.create_product(db, product.dict())
 
 

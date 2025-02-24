@@ -78,8 +78,8 @@ def test_send_low_stock_alert_contract(
         os.environ[
             "NOTIFICATION_SERVICE_URL"
         ] = f"http://{PACT_MOCK_HOST}:{PACT_MOCK_PORT}{NOTIFICATION_PATH}"
-        dummy_stock = SimpleNamespace(product_id=1, location_id=101, quantity=15)
-        result = send_low_stock_alert(dummy_stock)
+        dummy_stock_data = SimpleNamespace(product_id=1, location_id=101, quantity=15)
+        result = send_low_stock_alert(dummy_stock_data)
         # Assert
         assert result == expected_response
 
