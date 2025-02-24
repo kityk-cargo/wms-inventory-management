@@ -12,7 +12,6 @@ def get_by_sku(db: Session, sku: str) -> Optional[Product]:
 
 
 def create_product(db: Session, product_data: dict) -> Product:
-    # No duplicate check here; controller must call get_by_sku beforehand.
     product = Product(**product_data)
     db.add(product)
     db.commit()
