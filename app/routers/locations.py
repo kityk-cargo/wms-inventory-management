@@ -20,13 +20,13 @@ example_location_obj_alt = LocationResponse(
 
 @router.post("/", response_model=LocationResponse)
 def create_location_endpoint(location: LocationCreate, db: Session = Depends(get_db)):
-    if not location.aisle or len(location.aisle.strip()) == 0:
+    aisle = location.aisle.strip()
+    bin_code = location.bin.strip()
+    if not aisle:
         raise HTTPException(status_code=400, detail="Aisle identifier cannot be empty")
-    if not location.bin or len(location.bin.strip()) == 0:
+    if not bin_code:
         raise HTTPException(status_code=400, detail="Bin identifier cannot be empty")
-    location.aisle = location.aisle.strip()
-    location.bin = location.bin.strip()
-    if location_repo.exists(db, location.aisle, location.bin):
+    if location_repo.exists(db, aisle, bin_code):
         raise HTTPException(status_code=400, detail="Location already exists")
     return location_repo.create_location(db, location.dict())
 
@@ -38,8 +38,7 @@ def update_location_endpoint(
     existing_location = location_repo.get_by_id(db, location_id)
     if not existing_location:
         raise HTTPException(status_code=404, detail="Location not found")
-    update_data = location.dict()
-    return location_repo.update_location(db, existing_location, update_data)
+    return location_repo.update_location(db, existing_location, location.dict())
 
 
 @router.get("/{location_id}", response_model=LocationResponse)
