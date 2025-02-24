@@ -11,12 +11,9 @@ def dummy_stock():
 
 def test_send_low_stock_alert_without_url(monkeypatch, caplog):
     """Should log a critical error when NOTIFICATION_SERVICE_URL is undefined."""
-    # Arrange
     monkeypatch.delenv("NOTIFICATION_SERVICE_URL", raising=False)
     caplog.set_level(logging.CRITICAL)
-    # Act
     result = notification.send_low_stock_alert(dummy_stock())
-    # Assert
     assert any(
         "notification-url-undefined" in record.message for record in caplog.records
     )
@@ -29,13 +26,10 @@ def fake_post(*args, **kwargs):
 
 def test_send_low_stock_alert_api_unreachable(monkeypatch, caplog):
     """Should log an error and return an error dict when notification API is unreachable."""
-    # Arrange
     monkeypatch.setenv("NOTIFICATION_SERVICE_URL", "http://dummy-url")
     monkeypatch.setattr(notification.requests, "post", fake_post)
     caplog.set_level(logging.ERROR)
-    # Act
     result = notification.send_low_stock_alert(dummy_stock())
-    # Assert
     assert any("alert-failed" in record.message for record in caplog.records)
     expected = {
         "status": "error",
