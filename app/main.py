@@ -1,11 +1,17 @@
 from fastapi import FastAPI
-from app.routers import products, stock, locations
+from app.routers import products, stock, locations, health
 
-app = FastAPI(title="WMS Inventory Management")
+app = FastAPI(
+    title="WMS Inventory Management Service",
+    description="Service for managing inventory in a warehouse management system",
+    version="1.0.0",
+)
 
-app.include_router(products.router, prefix="/products", tags=["products"])
-app.include_router(stock.router, prefix="/stock", tags=["stock"])
-app.include_router(locations.router, prefix="/locations", tags=["locations"])
+# Include routers
+app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
+app.include_router(stock.router, prefix="/api/v1/stock", tags=["Stock"])
+app.include_router(locations.router, prefix="/api/v1/locations", tags=["Locations"])
+app.include_router(health.router, prefix="/health")
 
 
 @app.get("/")
