@@ -66,6 +66,21 @@ jobs:
         run: |
           pytest tests/integration -s --maxfail=0 --disable-warnings
 
+      - name: Checkout wms-contracts repository
+        uses: actions/checkout@v3
+        with:
+          repository: kityk-cargo/wms-contracts
+          path: wms-contracts
+
+      - name: Set environment variable for Pact directory
+        run: echo "PACT_DIR_PATH=$(pwd)/wms-contracts/pact/rest/wms_inventory_management" >> $GITHUB_ENV
+
+      - name: Run contract tests
+        run: |
+          pytest tests/contract -s --maxfail=0 --disable-warnings -m contract
+        env:
+          PACT_DIR_PATH: ${{ env.PACT_DIR_PATH }}
+
       # New step: Save Pact files to transient branch
       - name: Save Pact files to transient branch
         run: |
