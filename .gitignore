@@ -172,9 +172,7 @@ cython_debug/
 
 # Pact files
 pacts/
-report.html
-unit_report.html
-integration_report.html
+*report.html
 assets/style.css
 .idea/
 .mutmut-cache
