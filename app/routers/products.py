@@ -30,7 +30,7 @@ example_product_obj_alt = ProductResponse(
 )
 
 
-@router.post("/", response_model=ProductResponse)
+@router.post("", response_model=ProductResponse)
 def create_product_endpoint(product: ProductCreate, db: Session = Depends(get_db)):
     sku = product.sku.strip()
     name = product.name.strip()
@@ -56,7 +56,7 @@ def get_product_endpoint(product_id: int, db: Session = Depends(get_db)):
 
 
 @router.get(
-    "/",
+    "",
     response_model=List[ProductResponse],
     responses={
         200: {

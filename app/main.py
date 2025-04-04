@@ -5,6 +5,7 @@ app = FastAPI(
     title="WMS Inventory Management Service",
     description="Service for managing inventory in a warehouse management system",
     version="1.0.0",
+    redirect_slashes=True,  # Disable automatic redirects for trailing slashes
 )
 
 # Include routers

@@ -11,18 +11,20 @@ import io
 import contextlib
 import glob
 from fastapi import APIRouter
-from app.routers import products as products_module
 import pytest
 from typing import Any, Dict, List
+import json
+import app.repository.product_repository as product_repo
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Sample test data that matches what's in the contract
+# IMPORTANT: Product IDs must be integers according to the contract
 TEST_PRODUCTS = [
     {
-        "id": "1",
+        "id": 1,  # Integer ID as required by contract
         "name": "Product 1",
         "description": "Product 1 description",
         "category": "Category A",
@@ -31,7 +33,7 @@ TEST_PRODUCTS = [
         "updated_at": "2023-01-02T00:00:00Z",
     },
     {
-        "id": "2",
+        "id": 2,  # Integer ID as required by contract
         "name": "Product 2",
         "description": "Product 2 description",
         "category": "Category B",
@@ -67,39 +69,47 @@ async def provider_states(request_body: dict):
         # 1. Clear the test database's product table
         # 2. Insert the test products that match what's expected in the contract
 
-        # For this example, we're using a mock/override approach
-        # This simulates having the test data available for the API to return
-        if hasattr(products_module, "get_all_products"):
+        # For this example, we're using a mock/override approach at the repository level
+        # This is more reliable than mocking at the module level
+        if hasattr(product_repo, "list_products"):
             # Store original function for restoration later
-            if "get_all_products" not in _original_functions:
-                _original_functions["get_all_products"] = getattr(
-                    products_module, "get_all_products"
-                )
+            if "list_products" not in _original_functions:
+                _original_functions["list_products"] = product_repo.list_products
 
             # Override with test data
-            async def mock_get_all_products(
-                *args: Any, **kwargs: Any
-            ) -> List[Dict[str, Any]]:
+            def mock_list_products(*args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
+                logger.info(
+                    "Mock list_products called, returning test data with integer IDs"
+                )
+                # Verify that all test products have integer IDs
+                for product in TEST_PRODUCTS:
+                    assert isinstance(
+                        product["id"], int
+                    ), f"Product ID must be an integer, got {type(product['id'])}"
                 return TEST_PRODUCTS
 
-            setattr(products_module, "get_all_products", mock_get_all_products)
+            # Replace the function
+            product_repo.list_products = mock_list_products
+            logger.info("Successfully mocked product_repo.list_products")
 
     # Add more states as needed based on your contracts
     # For example:
     elif state == "no products exist":
         logger.info("Provider state: Setting up empty products list")
-        if hasattr(products_module, "get_all_products"):
-            if "get_all_products" not in _original_functions:
-                _original_functions["get_all_products"] = getattr(
-                    products_module, "get_all_products"
-                )
+        if hasattr(product_repo, "list_products"):
+            if "list_products" not in _original_functions:
+                _original_functions["list_products"] = product_repo.list_products
 
-            async def mock_get_empty_products(
+            def mock_empty_list_products(
                 *args: Any, **kwargs: Any
             ) -> List[Dict[str, Any]]:
+                logger.info("Mock empty list_products called, returning empty list")
                 return []
 
-            setattr(products_module, "get_all_products", mock_get_empty_products)
+            product_repo.list_products = mock_empty_list_products
+            logger.info(
+                "Successfully mocked product_repo.list_products with empty response"
+            )
 
     # You can add more states based on other contract requirements
 
@@ -108,6 +118,32 @@ async def provider_states(request_body: dict):
 
 # Add the provider state router to the test app
 app.include_router(provider_state_router)
+
+
+# Helper function to customize requests for Pact Verifier
+def request_customizer(request):
+    """
+    Customize requests to ensure redirects are followed and headers are properly set.
+    This is a clean way to handle redirects without modifying the application routes.
+    """
+    modified_request = {**request}
+
+    # Set allow_redirects to True to follow redirects
+    modified_request["allow_redirects"] = True
+
+    # Ensure proper headers are set
+    if "headers" not in modified_request:
+        modified_request["headers"] = {}
+
+    # Always set Accept header for JSON
+    modified_request["headers"]["Accept"] = "application/json"
+
+    # Log the customized request
+    path = request.get("path", "")
+    logger.info(f"Customizing request for path: {path}")
+    logger.info(f"Modified request: {modified_request}")
+
+    return modified_request
 
 
 @pytest.mark.contract
@@ -146,6 +182,18 @@ class InventoryManagementContractsTest(unittest.TestCase):
         cls.wait_for_server(cls.host, cls.port)
         logger.info("Uvicorn server is up and running")
 
+        # Verify the endpoint works directly
+        try:
+            resp = requests.get(
+                f"http://{cls.host}:{cls.port}/api/v1/products",
+                headers={"Accept": "application/json"},
+                allow_redirects=True,
+            )
+            logger.info(f"Test request to products endpoint: {resp.status_code}")
+            logger.info(f"Response: {resp.text}")
+        except Exception as e:
+            logger.error(f"Error testing products endpoint: {e}")
+
     def test_provider(self):
         """Pact verification test for all Inventory Management service contracts."""
         logger.info("Starting Pact verification test...")
@@ -176,6 +224,30 @@ class InventoryManagementContractsTest(unittest.TestCase):
         for pact_file in pact_files:
             logger.info("Verifying Pact file: %s", pact_file)
 
+            # Examine the pact file to understand what needs to be verified
+            try:
+                with open(pact_file, "r") as f:
+                    pact_content = json.load(f)
+                    logger.info(
+                        f"Processing contract for consumer: {pact_content.get('consumer', {}).get('name', 'unknown')}"
+                    )
+
+                    # Extract interactions to help debug issues
+                    for idx, interaction in enumerate(
+                        pact_content.get("interactions", [])
+                    ):
+                        logger.info(
+                            f"Interaction {idx}: {interaction.get('description')}"
+                        )
+                        logger.info(
+                            f"  Method: {interaction.get('request', {}).get('method')}"
+                        )
+                        logger.info(
+                            f"  Path: {interaction.get('request', {}).get('path')}"
+                        )
+            except Exception as e:
+                logger.error(f"Error reading Pact file: {e}")
+
             with io.StringIO() as buf, contextlib.redirect_stdout(buf):
                 verifier = Verifier(
                     provider="wms_inventory_management",
@@ -184,12 +256,10 @@ class InventoryManagementContractsTest(unittest.TestCase):
                     publish_verification_results=False,
                     provider_verify_options={
                         "follow_redirects": True,
-                        "request_customizer": lambda request: {
-                            **request,
-                            "allow_redirects": True,
-                        },
+                        "request_customizer": request_customizer,
                     },
                 )
+
                 output = verifier.verify_pacts(
                     pact_file,
                     provider_states_setup_url=f"http://{self.__class__.host}:{self.__class__.port}/_pact/provider_states/",
@@ -208,6 +278,7 @@ class InventoryManagementContractsTest(unittest.TestCase):
             if output[0] != 0:
                 verification_successful = False
                 logger.error("Pact verification failed for: %s", pact_file)
+                logger.error(f"Verification output: {verifier_output}")
 
         # Log all outputs at the end
         logger.info("All Pact verification outputs:\n%s", "\n".join(all_outputs))
@@ -226,9 +297,9 @@ class InventoryManagementContractsTest(unittest.TestCase):
         logger.info("Uvicorn server shutdown complete")
 
         # Restore any mocked functions
-        for func_name, original_func in _original_functions.items():
-            if hasattr(products_module, func_name):
-                setattr(products_module, func_name, original_func)
+        for module_name, original_func in _original_functions.items():
+            if hasattr(product_repo, module_name):
+                setattr(product_repo, module_name, original_func)
 
         # Clear the original functions dictionary
         _original_functions.clear()
