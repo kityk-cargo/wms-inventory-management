@@ -1,10 +1,12 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.database import get_db
 from app.schemas import LocationCreate, LocationResponse
 import app.repository.location_repository as location_repo
+from app.utils import create_error_response
 
 router = APIRouter()
 
@@ -23,11 +25,32 @@ def create_location_endpoint(location: LocationCreate, db: Session = Depends(get
     aisle = location.aisle.strip()
     bin_code = location.bin.strip()
     if not aisle:
-        raise HTTPException(status_code=400, detail="Aisle identifier cannot be empty")
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=create_error_response(
+                detail="Aisle identifier cannot be empty",
+                criticality="critical",
+                recovery_suggestion="Please provide a valid aisle identifier",
+            ),
+        )
     if not bin_code:
-        raise HTTPException(status_code=400, detail="Bin identifier cannot be empty")
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=create_error_response(
+                detail="Bin identifier cannot be empty",
+                criticality="critical",
+                recovery_suggestion="Please provide a valid bin identifier",
+            ),
+        )
     if location_repo.exists(db, aisle, bin_code):
-        raise HTTPException(status_code=400, detail="Location already exists")
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=create_error_response(
+                detail="Location already exists",
+                criticality="critical",
+                recovery_suggestion="Choose a different aisle/bin combination or update the existing location",
+            ),
+        )
     return location_repo.create_location(db, location.dict())
 
 
@@ -37,7 +60,14 @@ def update_location_endpoint(
 ):
     existing_location = location_repo.get_by_id(db, location_id)
     if not existing_location:
-        raise HTTPException(status_code=404, detail="Location not found")
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=create_error_response(
+                detail="Location not found",
+                criticality="critical",
+                recovery_suggestion="Verify the location ID or create a new location",
+            ),
+        )
     return location_repo.update_location(db, existing_location, location.dict())
 
 
@@ -45,7 +75,14 @@ def update_location_endpoint(
 def get_location_endpoint(location_id: int, db: Session = Depends(get_db)):
     location_obj = location_repo.get_by_id(db, location_id)
     if not location_obj:
-        raise HTTPException(status_code=404, detail="Location not found")
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=create_error_response(
+                detail="Location not found",
+                criticality="critical",
+                recovery_suggestion="Verify the location ID or create a new location",
+            ),
+        )
     return location_obj
 
 

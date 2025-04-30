@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 
 from app.database import get_db
+from app.utils import format_datetime
 
 router = APIRouter(tags=["Health"])
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ def create_health_response(
 
     response = {
         "status": overall_status,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": format_datetime(datetime.now()),
         "components": components,
     }
 
@@ -80,7 +81,7 @@ async def liveness_check():
     # Liveness only needs basic status without components
     return {
         "status": "UP",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": format_datetime(datetime.now()),
     }
 
 
