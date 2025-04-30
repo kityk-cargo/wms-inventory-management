@@ -31,7 +31,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 async def custom_json_middleware(request, call_next):
     response = await call_next(request)
     if isinstance(response, JSONResponse):
-        response_content = response.body.decode()
+        response_content = response.body.decode("utf-8")
         try:
             data = json.loads(response_content)
             response.body = json.dumps(data, cls=CustomJSONEncoder).encode()
