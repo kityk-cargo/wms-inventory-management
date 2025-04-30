@@ -1,11 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from app.utils import ISO_8601_UTC_FORMAT
 
 
 class StrictBaseModel(BaseModel):
     class Config:
         extra = "forbid"
+        json_encoders = {datetime: lambda dt: dt.strftime(ISO_8601_UTC_FORMAT)}
 
 
 # STOCK MODELS
