@@ -12,7 +12,6 @@ import contextlib
 import glob
 from fastapi import APIRouter
 import pytest
-from typing import Any, Dict, List
 import json
 import app.repository.product_repository as product_repo
 
@@ -46,8 +45,57 @@ TEST_PRODUCTS = [
 # Create a test-only router for provider states
 provider_state_router = APIRouter()
 
-# Dictionary to store original module functions for later restoration
-_original_functions: Dict[str, Any] = {}
+
+# State management to track the current provider state
+class StateManager:
+    def __init__(self):
+        self.current_state = None
+        self.params = {}
+        self.simulate_server_error = False
+
+    def set_state(self, state, params=None):
+        self.current_state = state
+        self.params = params or {}
+        if state == "product service is experiencing issues":
+            self.simulate_server_error = True
+        else:
+            self.simulate_server_error = False
+
+    def get_state(self):
+        return self.current_state, self.params
+
+
+# Create a global instance of StateManager
+state_manager = StateManager()
+
+
+# Mock implementations based on provider states
+def mock_list_products(*args, **kwargs):
+    """Mock implementation for list_products based on current state"""
+    state, _ = state_manager.get_state()
+    logger.info(f"Mock list_products called with state: {state}")
+
+    if state == "no products exist":
+        return []
+
+    # Default behavior for "products exist" or any other state
+    for product in TEST_PRODUCTS:
+        assert isinstance(
+            product["id"], int
+        ), f"Product ID must be an integer, got {type(product['id'])}"
+    return TEST_PRODUCTS
+
+
+def mock_get_by_id(db, product_id):
+    """Mock implementation for get_by_id based on current state"""
+    state, _ = state_manager.get_state()
+    logger.info(f"Mock get_by_id called with ID: {product_id} and state: {state}")
+    if state_manager.simulate_server_error:
+        raise Exception("Simulated server error")
+    if state == "product with ID 9999 does not exist":
+        return None
+
+    return next((p for p in TEST_PRODUCTS if p["id"] == product_id), None)
 
 
 @provider_state_router.post("/_pact/provider_states/")
@@ -62,56 +110,11 @@ async def provider_states(request_body: dict):
     params = request_body.get("params", {})
     logger.info("Setting up provider state: %s with params: %s", state, params)
 
-    # Handle different provider states
-    if state == "products exist":
-        logger.info("Provider state: Setting up test products")
-        # In a real implementation, this would:
-        # 1. Clear the test database's product table
-        # 2. Insert the test products that match what's expected in the contract
+    # Update the state manager
+    state_manager.set_state(state, params)
 
-        # For this example, we're using a mock/override approach at the repository level
-        # This is more reliable than mocking at the module level
-        if hasattr(product_repo, "list_products"):
-            # Store original function for restoration later
-            if "list_products" not in _original_functions:
-                _original_functions["list_products"] = product_repo.list_products
-
-            # Override with test data
-            def mock_list_products(*args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
-                logger.info(
-                    "Mock list_products called, returning test data with integer IDs"
-                )
-                # Verify that all test products have integer IDs
-                for product in TEST_PRODUCTS:
-                    assert isinstance(
-                        product["id"], int
-                    ), f"Product ID must be an integer, got {type(product['id'])}"
-                return TEST_PRODUCTS
-
-            # Replace the function
-            product_repo.list_products = mock_list_products
-            logger.info("Successfully mocked product_repo.list_products")
-
-    # Add more states as needed based on your contracts
-    # For example:
-    elif state == "no products exist":
-        logger.info("Provider state: Setting up empty products list")
-        if hasattr(product_repo, "list_products"):
-            if "list_products" not in _original_functions:
-                _original_functions["list_products"] = product_repo.list_products
-
-            def mock_empty_list_products(
-                *args: Any, **kwargs: Any
-            ) -> List[Dict[str, Any]]:
-                logger.info("Mock empty list_products called, returning empty list")
-                return []
-
-            product_repo.list_products = mock_empty_list_products
-            logger.info(
-                "Successfully mocked product_repo.list_products with empty response"
-            )
-
-    # You can add more states based on other contract requirements
+    # Update the app's flag for server error simulation
+    setattr(app, "simulate_server_error", state_manager.simulate_server_error)
 
     return {"status": "success"}
 
@@ -144,6 +147,17 @@ def request_customizer(request):
     logger.info(f"Modified request: {modified_request}")
 
     return modified_request
+
+
+@pytest.fixture(autouse=True)
+def setup_mocks(monkeypatch):
+    """Pytest fixture to set up all mocks needed for the tests"""
+    monkeypatch.setattr(product_repo, "list_products", mock_list_products)
+    monkeypatch.setattr(product_repo, "get_by_id", mock_get_by_id)
+
+    yield
+
+    # No need to manually restore - monkeypatch handles this automatically
 
 
 @pytest.mark.contract
@@ -181,6 +195,9 @@ class InventoryManagementContractsTest(unittest.TestCase):
         cls.server_thread.start()
         cls.wait_for_server(cls.host, cls.port)
         logger.info("Uvicorn server is up and running")
+
+        # Initialize the server error simulation flag
+        setattr(app, "simulate_server_error", False)
 
         # Verify the endpoint works directly
         try:
@@ -295,11 +312,3 @@ class InventoryManagementContractsTest(unittest.TestCase):
         cls.server.should_exit = True
         cls.server_thread.join()
         logger.info("Uvicorn server shutdown complete")
-
-        # Restore any mocked functions
-        for module_name, original_func in _original_functions.items():
-            if hasattr(product_repo, module_name):
-                setattr(product_repo, module_name, original_func)
-
-        # Clear the original functions dictionary
-        _original_functions.clear()
