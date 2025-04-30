@@ -48,6 +48,17 @@ provider_state_router = APIRouter()
 
 # State management to track the current provider state
 class StateManager:
+    """
+    Manages the current state of the provider for testing purposes.
+
+    This class is used to simulate different states of the provider during contract testing.
+    It allows setting a specific state, retrieving the current state, and simulating server errors.
+
+    Attributes:
+        current_state (str): The current state of the provider.
+        params (dict): Additional parameters associated with the current state.
+        simulate_server_error (bool): Flag to indicate if the provider should simulate a server error.
+    """
     def __init__(self):
         self.current_state = None
         self.params = {}
