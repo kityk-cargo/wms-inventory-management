@@ -15,6 +15,8 @@ import app.models as models
 import app.repository.stock_repository as stock_repo
 import app.repository.product_repository as product_repo
 import app.repository.location_repository as location_repo
+import json
+from typing import Optional, Dict, Any
 
 
 # Helpers for simulating SQLAlchemy column expressions
@@ -186,6 +188,50 @@ def db():
     return InMemoryDB()
 
 
+def validate_error_response(
+    response: JSONResponse,
+    expected_status_code: int,
+    expected_detail: str,
+    expected_criticality: Optional[str] = None,
+):
+    """
+    Validate an error response from the API.
+
+    Args:
+        response: The JSONResponse to validate
+        expected_status_code: The expected HTTP status code
+        expected_detail: Expected error detail message
+        expected_criticality: Expected criticality level (if any)
+    """
+    assert isinstance(response, JSONResponse), "Response should be a JSONResponse"
+    assert (
+        response.status_code == expected_status_code
+    ), f"Expected status code {expected_status_code}, got {response.status_code}"
+
+    body = response.body
+    if isinstance(body, (bytes, memoryview)):
+        body_str = bytes(body).decode("utf-8")
+    else:
+        body_str = str(body)
+
+    content: Dict[str, Any] = json.loads(body_str)
+
+    assert "id" in content, "Error response should contain an ID"
+    assert "detail" in content, "Error response should contain a detail message"
+
+    detail = str(content["detail"]).lower()
+    assert (
+        expected_detail.lower() in detail
+    ), f"Expected '{expected_detail}' in error message, got '{detail}'"
+
+    if expected_criticality:
+        assert "criticality" in content, "Error response should contain criticality"
+        criticality = content.get("criticality")
+        assert (
+            criticality == expected_criticality
+        ), f"Expected criticality to be '{expected_criticality}', got '{criticality}'"
+
+
 # ---------------------- Product Tests ----------------------
 @pytest.mark.parametrize(
     "product_data",
@@ -231,9 +277,10 @@ def test_get_nonexistent_product(db):
     result = products.get_product_endpoint(999, db)
     # Assert
     validate_error_response(
-        result,
+        response=result,
         expected_status_code=404,
-        expected_substrings=["Product not found", "critical"],
+        expected_detail="Product not found",
+        expected_criticality="critical",
     )
 
 
@@ -249,11 +296,12 @@ def test_create_product_invalid_sku(db):
     # Act
     result = products.create_product_endpoint(invalid_product, db)
     # Assert
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 400
-    content = result.body.decode("utf-8")
-    assert "SKU cannot be empty" in content
-    assert "critical" in content
+    validate_error_response(
+        response=result,
+        expected_status_code=400,
+        expected_detail="SKU cannot be empty",
+        expected_criticality="critical",
+    )
 
 
 def test_create_product_duplicate_sku(db):
@@ -272,11 +320,12 @@ def test_create_product_duplicate_sku(db):
     result = products.create_product_endpoint(ProductCreate(**product_data), db)
 
     # Assert
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 409
-    content = result.body.decode("utf-8")
-    assert "Product with this SKU already exists" in content
-    assert "critical" in content
+    validate_error_response(
+        response=result,
+        expected_status_code=409,
+        expected_detail="Product with this SKU already exists",
+        expected_criticality="critical",
+    )
 
 
 @pytest.mark.parametrize("invalid_id", [-1, 0, 999999])
@@ -287,16 +336,13 @@ def test_get_product_invalid_id(db, invalid_id):
     result = products.get_product_endpoint(invalid_id, db)
 
     # Assert
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 404
-    content = result.body.decode("utf-8")
-
-    if invalid_id <= 0:
-        assert "Invalid product ID" in content
-    else:
-        assert "Product not found" in content
-
-    assert "critical" in content
+    expected_message = "Invalid product ID" if invalid_id <= 0 else "Product not found"
+    validate_error_response(
+        response=result,
+        expected_status_code=404,
+        expected_detail=expected_message,
+        expected_criticality="critical",
+    )
 
 
 # ---------------------- Location Tests ----------------------
@@ -328,11 +374,12 @@ def test_create_duplicate_location(db):
     # Act
     result = locations.create_location_endpoint(LocationCreate(**loc_data), db)
     # Assert
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 400
-    content = result.body.decode("utf-8")
-    assert "Location already exists" in content
-    assert "critical" in content
+    validate_error_response(
+        response=result,
+        expected_status_code=400,
+        expected_detail="Location already exists",
+        expected_criticality="critical",
+    )
 
 
 def test_create_location_invalid_format(db):
@@ -342,11 +389,12 @@ def test_create_location_invalid_format(db):
     # Act
     result = locations.create_location_endpoint(invalid_location, db)
     # Assert
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 400
-    content = result.body.decode("utf-8")
-    assert "Aisle identifier cannot be empty" in content
-    assert "critical" in content
+    validate_error_response(
+        response=result,
+        expected_status_code=400,
+        expected_detail="Aisle identifier cannot be empty",
+        expected_criticality="critical",
+    )
 
 
 @pytest.mark.parametrize(
@@ -363,16 +411,17 @@ def test_create_location_invalid_data(db, invalid_data):
     # Act
     result = locations.create_location_endpoint(location_in, db)
     # Assert
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 400
-    content = result.body.decode("utf-8")
-
-    if invalid_data["aisle"].strip() == "":
-        assert "Aisle identifier cannot be empty" in content
-    else:
-        assert "Bin identifier cannot be empty" in content
-
-    assert "critical" in content
+    expected_message = (
+        "Aisle identifier cannot be empty"
+        if invalid_data["aisle"].strip() == ""
+        else "Bin identifier cannot be empty"
+    )
+    validate_error_response(
+        response=result,
+        expected_status_code=400,
+        expected_detail=expected_message,
+        expected_criticality="critical",
+    )
 
 
 # ---------------------- Stock Tests ----------------------
@@ -439,11 +488,12 @@ def test_remove_stock_insufficient(db):
     )
 
     # Assert
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 400
-    content = result.body.decode("utf-8")
-    assert "Insufficient stock" in content
-    assert "critical" in content
+    validate_error_response(
+        response=result,
+        expected_status_code=400,
+        expected_detail="Insufficient stock",
+        expected_criticality="critical",
+    )
 
 
 @pytest.mark.parametrize(
@@ -522,11 +572,12 @@ def test_stock_transaction_rollback(db):
     )
 
     # Assert error response
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 400
-    content = result.body.decode("utf-8")
-    assert "Insufficient stock" in content
-    assert "critical" in content
+    validate_error_response(
+        response=result,
+        expected_status_code=400,
+        expected_detail="Insufficient stock",
+        expected_criticality="critical",
+    )
 
     # Assert stock level hasn't changed
     current_stock = stock_repo.get_stock(db, product.id, location.id)
@@ -643,8 +694,9 @@ def test_stock_invalid_quantity(db, invalid_quantity):
     )
 
     # Assert
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 400
-    content = result.body.decode("utf-8")
-    assert "Quantity must be positive" in content
-    assert "critical" in content
+    validate_error_response(
+        response=result,
+        expected_status_code=400,
+        expected_detail="Quantity must be positive",
+        expected_criticality="critical",
+    )

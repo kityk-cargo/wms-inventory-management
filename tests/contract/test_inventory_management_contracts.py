@@ -59,6 +59,7 @@ class StateManager:
         params (dict): Additional parameters associated with the current state.
         simulate_server_error (bool): Flag to indicate if the provider should simulate a server error.
     """
+
     def __init__(self):
         self.current_state = None
         self.params = {}
