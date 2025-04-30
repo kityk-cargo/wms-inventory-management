@@ -230,11 +230,11 @@ def test_get_nonexistent_product(db):
     # Act
     result = products.get_product_endpoint(999, db)
     # Assert
-    assert isinstance(result, JSONResponse)
-    assert result.status_code == 404
-    content = result.body.decode("utf-8")
-    assert "Product not found" in content
-    assert "critical" in content
+    validate_error_response(
+        result,
+        expected_status_code=404,
+        expected_substrings=["Product not found", "critical"],
+    )
 
 
 def test_create_product_invalid_sku(db):
