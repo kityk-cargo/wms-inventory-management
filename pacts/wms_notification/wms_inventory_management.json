@@ -1,0 +1,68 @@
+{
+  "consumer": {
+    "name": "wms_inventory_management"
+  },
+  "provider": {
+    "name": "wms_notification"
+  },
+  "interactions": [
+    {
+      "description": "a low stock alert notification",
+      "providerState": "Notification service is configured for success",
+      "request": {
+        "method": "post",
+        "path": "/api/v1/notifications",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "level": "Warning",
+          "category": "stock alerts",
+          "title": "Low stock alert for product 1 at location 101",
+          "message": "Stock level is 15. Consider restocking."
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+        },
+        "body": {
+          "status": "success",
+          "message": "Alert sent successfully"
+        }
+      }
+    },
+    {
+      "description": "a low stock alert notification that fails",
+      "providerState": "Notification service is experiencing a failure",
+      "request": {
+        "method": "post",
+        "path": "/api/v1/notifications",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "level": "Warning",
+          "category": "stock alerts",
+          "title": "Low stock alert for product 1 at location 101",
+          "message": "Stock level is 15. Consider restocking."
+        }
+      },
+      "response": {
+        "status": 500,
+        "headers": {
+        },
+        "body": {
+          "status": "error",
+          "message": "Failed to deliver notification",
+          "details": "Simulated failure for testing"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "2.0.0"
+    }
+  }
+}
