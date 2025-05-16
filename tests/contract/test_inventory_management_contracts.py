@@ -19,11 +19,11 @@ import app.repository.product_repository as product_repo
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Sample test data that matches what's in the contract
-# IMPORTANT: Product IDs must be integers according to the contract
+# Test data that matches the contract requirements
+# Product IDs must be integers according to the contract
 TEST_PRODUCTS = [
     {
-        "id": 1,  # Integer ID as required by contract
+        "id": 1,
         "name": "Product 1",
         "description": "Product 1 description",
         "category": "Category A",
@@ -32,7 +32,7 @@ TEST_PRODUCTS = [
         "updated_at": "2023-01-02T00:00:00Z",
     },
     {
-        "id": 2,  # Integer ID as required by contract
+        "id": 2,
         "name": "Product 2",
         "description": "Product 2 description",
         "category": "Category B",
@@ -46,19 +46,8 @@ TEST_PRODUCTS = [
 provider_state_router = APIRouter()
 
 
-# State management to track the current provider state
 class StateManager:
-    """
-    Manages the current state of the provider for testing purposes.
-
-    This class is used to simulate different states of the provider during contract testing.
-    It allows setting a specific state, retrieving the current state, and simulating server errors.
-
-    Attributes:
-        current_state (str): The current state of the provider.
-        params (dict): Additional parameters associated with the current state.
-        simulate_server_error (bool): Flag to indicate if the provider should simulate a server error.
-    """
+    """Manages provider state for testing different contract scenarios."""
 
     def __init__(self):
         self.current_state = None
@@ -68,22 +57,19 @@ class StateManager:
     def set_state(self, state, params=None):
         self.current_state = state
         self.params = params or {}
-        if state == "product service is experiencing issues":
-            self.simulate_server_error = True
-        else:
-            self.simulate_server_error = False
+        self.simulate_server_error = state == "product service is experiencing issues"
 
     def get_state(self):
         return self.current_state, self.params
 
 
-# Create a global instance of StateManager
+# Global instance of StateManager
 state_manager = StateManager()
 
 
-# Mock implementations based on provider states
+# Mock product repository implementations
 def mock_list_products(*args, **kwargs):
-    """Mock implementation for list_products based on current state"""
+    """Returns products based on current provider state"""
     state, _ = state_manager.get_state()
     logger.info(f"Mock list_products called with state: {state}")
 
@@ -99,11 +85,13 @@ def mock_list_products(*args, **kwargs):
 
 
 def mock_get_by_id(db, product_id):
-    """Mock implementation for get_by_id based on current state"""
+    """Returns a product by ID based on current provider state"""
     state, _ = state_manager.get_state()
     logger.info(f"Mock get_by_id called with ID: {product_id} and state: {state}")
+
     if state_manager.simulate_server_error:
         raise Exception("Simulated server error")
+
     if state == "product with ID 9999 does not exist":
         return None
 
@@ -112,12 +100,7 @@ def mock_get_by_id(db, product_id):
 
 @provider_state_router.post("/_pact/provider_states/")
 async def provider_states(request_body: dict):
-    """
-    Handle provider state setup for Pact testing.
-
-    This endpoint receives state setup requests from the Pact verifier and
-    configures the test environment accordingly.
-    """
+    """Handles provider state setup for Pact testing"""
     state = request_body.get("state")
     params = request_body.get("params", {})
     logger.info("Setting up provider state: %s with params: %s", state, params)
@@ -135,25 +118,16 @@ async def provider_states(request_body: dict):
 app.include_router(provider_state_router)
 
 
-# Helper function to customize requests for Pact Verifier
 def request_customizer(request):
-    """
-    Customize requests to ensure redirects are followed and headers are properly set.
-    This is a clean way to handle redirects without modifying the application routes.
-    """
+    """Customizes requests for Pact Verifier to handle redirects and headers"""
     modified_request = {**request}
-
-    # Set allow_redirects to True to follow redirects
     modified_request["allow_redirects"] = True
 
-    # Ensure proper headers are set
+    # Ensure proper headers
     if "headers" not in modified_request:
         modified_request["headers"] = {}
-
-    # Always set Accept header for JSON
     modified_request["headers"]["Accept"] = "application/json"
 
-    # Log the customized request
     path = request.get("path", "")
     logger.info(f"Customizing request for path: {path}")
     logger.info(f"Modified request: {modified_request}")
@@ -163,28 +137,20 @@ def request_customizer(request):
 
 @pytest.fixture(autouse=True)
 def setup_mocks(monkeypatch):
-    """Pytest fixture to set up all mocks needed for the tests"""
+    """Sets up all mocks needed for the tests"""
     monkeypatch.setattr(product_repo, "list_products", mock_list_products)
     monkeypatch.setattr(product_repo, "get_by_id", mock_get_by_id)
-
     yield
-
     # No need to manually restore - monkeypatch handles this automatically
 
 
 @pytest.mark.contract
 class InventoryManagementContractsTest(unittest.TestCase):
-    """
-    Tests all Pact contracts for the WMS Inventory Management Service.
-
-    This test verifies that the inventory management service fulfills all contracts
-    expected by consumer services by checking all pact files in the specified
-    directory. This includes contracts from UI, Order Processing, and any other
-    service that relies on inventory management.
-    """
+    """Tests Pact contracts for the WMS Inventory Management Service"""
 
     @classmethod
     def wait_for_server(cls, host: str, port: int, timeout: int = 10) -> None:
+        """Waits for the test server to be ready"""
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
@@ -224,7 +190,7 @@ class InventoryManagementContractsTest(unittest.TestCase):
             logger.error(f"Error testing products endpoint: {e}")
 
     def test_provider(self):
-        """Pact verification test for all Inventory Management service contracts."""
+        """Verifies all Inventory Management service contracts"""
         logger.info("Starting Pact verification test...")
 
         # Set up the default directory path
@@ -257,9 +223,10 @@ class InventoryManagementContractsTest(unittest.TestCase):
             try:
                 with open(pact_file, "r") as f:
                     pact_content = json.load(f)
-                    logger.info(
-                        f"Processing contract for consumer: {pact_content.get('consumer', {}).get('name', 'unknown')}"
+                    consumer_name = pact_content.get("consumer", {}).get(
+                        "name", "unknown"
                     )
+                    logger.info(f"Processing contract for consumer: {consumer_name}")
 
                     # Extract interactions to help debug issues
                     for idx, interaction in enumerate(
@@ -304,7 +271,9 @@ class InventoryManagementContractsTest(unittest.TestCase):
                 "SUCCESS" if output[0] == 0 else "FAILED",
             )
 
-            if output[0] != 0:
+            pact_verification_failed: bool = output[0] != 0
+
+            if pact_verification_failed:
                 verification_successful = False
                 logger.error("Pact verification failed for: %s", pact_file)
                 logger.error(f"Verification output: {verifier_output}")
