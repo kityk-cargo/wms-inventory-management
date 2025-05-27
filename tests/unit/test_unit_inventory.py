@@ -585,7 +585,7 @@ def test_stock_transaction_rollback(db):
 
 
 @pytest.mark.parametrize(
-    "initial_qty,remove_qty,expected_alert",
+    "initial_quantity,remove_quantity,expected_alert",
     [
         (50, 40, True),  # Drop below threshold (10 remaining)
         (50, 20, False),  # Stay above threshold (30 remaining)
@@ -593,12 +593,12 @@ def test_stock_transaction_rollback(db):
         (20, 20, True),  # Drop to zero
     ],
 )
-def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
+def test_stock_alert_scenarios(db, initial_quantity, remove_quantity, expected_alert):
     """Should correctly trigger low stock alerts in various scenarios."""
     # Arrange
     product = products.create_product_endpoint(
         ProductCreate(
-            sku=f"ALERT-TEST-{initial_qty}-{remove_qty}",
+            sku=f"ALERT-TEST-{initial_quantity}-{remove_quantity}",
             name="Test",
             category="Test",
             description="Test",
@@ -613,7 +613,7 @@ def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
     # Add initial stock
     stock.add_stock(
         StockOperation(
-            product_id=product.id, location_id=location.id, quantity=initial_qty
+            product_id=product.id, location_id=location.id, quantity=initial_quantity
         ),
         db,
     )
@@ -622,7 +622,7 @@ def test_stock_alert_scenarios(db, initial_qty, remove_qty, expected_alert):
     with patch("app.routers.stock.send_low_stock_alert") as mock_notify:
         stock.remove_stock(
             StockOperation(
-                product_id=product.id, location_id=location.id, quantity=remove_qty
+                product_id=product.id, location_id=location.id, quantity=remove_quantity
             ),
             db,
         )
