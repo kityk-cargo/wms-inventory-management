@@ -1,35 +1,35 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 from app.utils import ISO_8601_UTC_FORMAT
 
 
 class StrictBaseModel(BaseModel):
-    class Config:
-        extra = "forbid"
-        json_encoders = {datetime: lambda dt: dt.strftime(ISO_8601_UTC_FORMAT)}
+    model_config = ConfigDict(
+        extra="forbid",
+        json_encoders={datetime: lambda dt: dt.strftime(ISO_8601_UTC_FORMAT)},
+    )
 
 
 # STOCK MODELS
 class StockOperation(StrictBaseModel):
-    product_id: int = Field(..., example=1)
-    location_id: int = Field(..., example=103)
-    quantity: int = Field(..., example=50)
+    product_id: int = Field(..., json_schema_extra={"example": 1})
+    location_id: int = Field(..., json_schema_extra={"example": 103})
+    quantity: int = Field(..., json_schema_extra={"example": 50})
 
 
 class StockResponse(StrictBaseModel):
-    product_id: int = Field(..., example=1)
-    location_id: int = Field(..., example=103)
-    quantity: int = Field(..., example=50)
+    product_id: int = Field(..., json_schema_extra={"example": 1})
+    location_id: int = Field(..., json_schema_extra={"example": 103})
+    quantity: int = Field(..., json_schema_extra={"example": 50})
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # LOCATION MODELS
 class LocationBase(StrictBaseModel):
-    aisle: str = Field(..., example="B07")
-    bin: str = Field(..., example="R42")
+    aisle: str = Field(..., json_schema_extra={"example": "B07"})
+    bin: str = Field(..., json_schema_extra={"example": "R42"})
 
 
 class LocationCreate(LocationBase):
@@ -37,20 +37,21 @@ class LocationCreate(LocationBase):
 
 
 class LocationResponse(LocationBase):
-    id: int = Field(..., example=103)
-    created_at: datetime = Field(..., example=datetime(2023, 1, 1, 0, 0, 0))
+    id: int = Field(..., json_schema_extra={"example": 103})
+    created_at: datetime = Field(
+        ..., json_schema_extra={"example": "2023-01-01T00:00:00Z"}
+    )
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # PRODUCT MODELS
 class ProductBase(StrictBaseModel):
-    sku: str = Field(..., example="EL-2745-89B")
-    name: str = Field(..., example="LED Panel 40W")
-    category: str = Field(..., example="Lighting Equipment")
+    sku: str = Field(..., json_schema_extra={"example": "EL-2745-89B"})
+    name: str = Field(..., json_schema_extra={"example": "LED Panel 40W"})
+    category: str = Field(..., json_schema_extra={"example": "Lighting Equipment"})
     description: Optional[str] = Field(
-        None, example="40W LED Panel, 600x600mm, 4000K, IP20"
+        None, json_schema_extra={"example": "40W LED Panel, 600x600mm, 4000K, IP20"}
     )
 
 
@@ -59,9 +60,12 @@ class ProductCreate(ProductBase):
 
 
 class ProductResponse(ProductBase):
-    id: int = Field(..., example=1)
-    created_at: datetime = Field(..., example=datetime(2023, 1, 1, 0, 0, 0))
-    updated_at: datetime = Field(..., example=datetime(2023, 1, 2, 0, 0, 0))
+    id: int = Field(..., json_schema_extra={"example": 1})
+    created_at: datetime = Field(
+        ..., json_schema_extra={"example": "2023-01-01T00:00:00Z"}
+    )
+    updated_at: datetime = Field(
+        ..., json_schema_extra={"example": "2023-01-02T00:00:00Z"}
+    )
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

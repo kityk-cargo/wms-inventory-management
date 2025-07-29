@@ -46,7 +46,7 @@ def check_database_connectivity(db: Session) -> Dict[str, Any]:
 
 
 def create_health_response(
-    components: Optional[Dict[str, Dict[str, Any]]] = None
+    components: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Tuple[Dict[str, Any], bool]:
     """
     Create a standardized health response with the given components.
